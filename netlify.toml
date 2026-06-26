@@ -1,4 +1,4 @@
-@asi_anime (S01-02) kirio fanclub.mp4[build]
+[build]
   publish = "."
   functions = "netlify/functions"
 
