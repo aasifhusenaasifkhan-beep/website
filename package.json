@@ -1,7 +1,7 @@
 {
   "name": "animesubstudio-site",
   "version": "2.0.0",
-  "main": "netlify/functions/index.js",
+  "main": "netlify/functions/api.js",
   "scripts": {
     "build": "mkdir -p public && cp index.html public/ && cp admin.html public/"
   },
@@ -9,6 +9,7 @@
     "@supabase/supabase-js": "^2.39.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
     "node-fetch": "^2.7.0",
     "serverless-http": "^3.2.0",
     "uuid": "^9.0.0"
