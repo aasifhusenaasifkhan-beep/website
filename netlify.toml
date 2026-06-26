@@ -6,3 +6,7 @@
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
   status = 200
+
+# Yeh naya part add karna hai
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
