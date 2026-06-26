@@ -274,7 +274,7 @@ app.get("/", (req, res) => {
   res.send("AnimeSubStudio Bot is running!");
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
   bot.start();
   console.log("Bot started...");
