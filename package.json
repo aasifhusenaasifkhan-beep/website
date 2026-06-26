@@ -2,6 +2,9 @@
   "name": "animesubstudio-site",
   "version": "2.0.0",
   "main": "netlify/functions/index.js",
+  "scripts": {
+    "build": "echo 'No build step needed'"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "cors": "^2.8.5",
