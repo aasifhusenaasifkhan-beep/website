@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AnimeSubStudio</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root { --bg: #0f0f0f; --header: rgba(26, 26, 26, 0.95); --primary: #e50914; --text: #fff; --border: #333; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+    
+    body { 
+      background: var(--bg); 
+      color: var(--text); 
+      overflow-x: hidden;
+    }
+    
+    .header { background: var(--header); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); }
+    .header .logo { font-size: 24px; font-weight: 800; color: var(--primary); cursor: pointer; text-transform: uppercase; letter-spacing: 1.5px; }
+    .search-bar { flex: 1; margin: 0 20px; max-width: 500px; position: relative; }
+    .search-bar input { width: 100%; padding: 12px 45px 12px 20px; border: 1px solid var(--border); border-radius: 30px; background: rgba(30, 30, 30, 0.85); color: white; font-size: 14px; transition: 0.3s; }
+    .search-bar input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 10px rgba(229, 9, 20, 0.5); }
+    .search-bar i { position: absolute; right: 20px; top: 15px; color: #aaa; }
+    .menu-btn { font-size: 24px; cursor: pointer; color: var(--primary); }
+
+    .sidebar { position: fixed; right: -280px; top: 0; width: 280px; height: 100%; background: var(--header); padding: 30px 20px; transition: right 0.3s ease-in-out; z-index: 1000; overflow-y: auto; border-left: 1px solid var(--border); backdrop-filter: blur(15px); }
+    .sidebar.open { right: 0; }
+    .sidebar h3 { font-size: 20px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
+    .sidebar a { display: block; color: white; padding: 12px 15px; text-decoration: none; margin: 5px 0; border-radius: 5px; font-size: 16px; font-weight: bold; }
+    .sidebar a:hover { background: rgba(229, 9, 20, 0.1); color: var(--primary); }
+    .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; display: none; }
+    .overlay.show { display: block; }
+
+    .section-title { padding: 30px 20px 10px 20px; font-size: 24px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--primary); font-weight: 800; }
+    .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; padding: 20px; }
+    .post-card { background: rgba(26, 26, 26, 0.8); border-radius: 8px; overflow: hidden; position: relative; cursor: pointer; border: 1px solid var(--border); transition: 0.3s ease; }
+    .post-card:hover { transform: translateY(-8px); border-color: var(--primary); box-shadow: 0 10px 20px rgba(229, 9, 20, 0.3); }
+    .post-card img { width: 100%; height: 230px; object-fit: cover; }
+    .post-card .category-tag { position: absolute; top: 8px; right: 8px; background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .post-card .name { padding: 12px; font-size: 14px; text-align: center; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .detail-page { display: none; padding: 30px 20px; max-width: 900px; margin: 0 auto; background: rgba(15, 15, 15, 0.9); border-radius: 12px; border: 1px solid var(--border); backdrop-filter: blur(10px); }
+    .detail-page.active { display: block; }
+    .back-btn { background: none; color: var(--primary); border: none; font-size: 18px; cursor: pointer; margin-bottom: 25px; font-weight: bold; transition: 0.2s; }
+    .back-btn:hover { color: white; }
+    .detail-header { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 30px; }
+    .detail-header img { width: 230px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+    .detail-info { flex: 1; min-width: 280px; }
+    .detail-info h2 { font-size: 32px; margin-bottom: 15px; color: var(--primary); font-weight: 800; }
+    .detail-info p { margin-bottom: 12px; font-size: 15px; line-height: 1.6; color: #ccc; }
+    .detail-info p strong { color: white; }
+    
+    .episodes { margin-top: 30px; background: #151515; padding: 20px; border-radius: 8px; border: 1px solid var(--border); }
+    .episodes h3 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
+    .episodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
+    .episodes button { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
+    .episodes button:hover { background: #b8070e; transform: scale(1.05); }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 2000; padding: 20px; backdrop-filter: blur(5px); }
+    .modal.active { display: flex; }
+    .modal-box { background: #1a1a1a; border: 1px solid var(--border); padding: 35px; border-radius: 12px; text-align: center; width: 100%; max-width: 400px; position: relative; }
+    .modal-box h3 { margin-bottom: 25px; color: var(--primary); font-size: 22px; }
+    .modal-box input { width: 100%; padding: 12px; margin-bottom: 15px; background: #252525; border: 1px solid var(--border); color: white; border-radius: 6px; text-align: center; font-size: 15px; }
+    .modal-box button { background: var(--primary); color: white; padding: 12px 24px; border: none; border-radius: 6px; margin: 8px; cursor: pointer; font-weight: bold; font-size: 14px; width: calc(50% - 20px); }
+    .modal-box .full-width-btn { width: 100%; margin: 8px 0; }
+    .close-modal { position: absolute; top: 15px; right: 15px; font-size: 22px; cursor: pointer; color: #777; transition: 0.2s; }
+    .close-modal:hover { color: white; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <span class="logo" onclick="showHome()">AnimeSubStudio</span>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search by name or genre..." oninput="searchPosts()">
+      <i class="fa-solid fa-magnifying-glass"></i>
+    </div>
+    <span class="menu-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></span>
+  </div>
+
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <h3>Filters Menu</h3>
+    <a href="#" onclick="showAllPosts()">All Posts</a>
+    <a href="#" onclick="showSidebarSection('category')">Categories</a>
+    <a href="#" onclick="showSidebarSection('genre')">Genres</a>
+    <a href="#" onclick="showSidebarSection('az')">A2Z 0-9</a>
+    <a href="#" id="tgChannel" target="_blank"><i class="fa-brands fa-telegram"></i> Channel Link</a>
+    <a href="#" id="tgGroup" target="_blank"><i class="fa-brands fa-telegram"></i> Group Link</a>
+  </div>
+
+  <div id="mainContent">
+    <h2 class="section-title" id="gridTitle">All Posts</h2>
+    <div id="postsGrid" class="posts-grid"></div>
+    
+    <div id="detailPage" class="detail-page">
+      <button class="back-btn" onclick="showHome()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-box" id="modalContent"></div>
+  </div>
+
+  <script>
+    let allPosts = [];
+    let settings = {};
+
+    async function loadApp() {
+      const postsRes = await fetch("/api/posts");
+      allPosts = await postsRes.json();
+      renderPosts(allPosts);
+
+      const setRes = await fetch("/api/settings");
+      settings = await setRes.json();
+      document.getElementById("tgChannel").href = settings.channel_link || "#";
+      document.getElementById("tgGroup").href = settings.group_link || "#";
+    }
+
+    function renderPosts(posts) {
+      const grid = document.getElementById("postsGrid");
+      if(posts.length === 0) {
+        grid.innerHTML = "<div style='grid-column: 1/-1; text-align:center; padding:100px 0; color:#777;'>Koi post nahi mili.</div>";
+        return;
+      }
+      grid.innerHTML = posts.map(p => `
+        <div class="post-card" onclick="showDetail('${p.id}')">
+          <img src="${p.image_url}" alt="${p.name}">
+          <span class="category-tag">${p.category}</span>
+          <div class="name">${p.name}</div>
+        </div>
+      `).join("");
+    }
+
+    async function showDetail(postId) {
+      const post = allPosts.find(p => p.id === postId);
+      if (!post) return;
+      
+      document.getElementById("postsGrid").style.display = "none";
+      document.getElementById("gridTitle").style.display = "none";
+      document.getElementById("detailPage").classList.add("active");
+      
+      const epRes = await fetch(`/api/episodes/${postId}`);
+      const episodes = await epRes.json();
+      const normalizedGenres = parseGenres(post.genres).join(", ");
+      
+      document.getElementById("detailContent").innerHTML = `
+        <div class="detail-header">
+          <img src="${post.image_url}" alt="${post.name}">
+          <div class="detail-info">
+            <h2>${post.name}</h2>
+            <p><strong>Genre:</strong> ${normalizedGenres || "N/A"}</p>
+            <p><strong>Release Date:</strong> ${post.release_date || "N/A"}</p>
+            <p><strong>Season:</strong> ${post.season || "N/A"}</p>
+            <p><strong>Story:</strong> ${post.short_story || "N/A"}</p>
+          </div>
+        </div>
+        <div class="episodes">
+          <h3>EPISODE LIST</h3>
+          <div class="episodes-grid">
+            ${episodes.map(ep => `
+              <button onclick="handleEpisode('${post.name}', '${ep.episode_label}')">${ep.episode_label}</button>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function parseGenres(genreStr) {
+      if (!genreStr) return [];
+      return genreStr.replace(/[,;\-_]/g, ' ').split(/\s+/).map(g => g.trim()).filter(Boolean);
+    }
+
+    function handleEpisode(postName, epLabel) {
+      showModal(`
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <h3>${postName}</h3>
+        <p style="margin-bottom:20px; font-weight:bold;">${epLabel}</p>
+        <button class="full-width-btn" onclick="solveShortener('${postName}', '${epLabel}')">Solve Shortener</button>
+        <button class="full-width-btn" style="background:#0066cc;" onclick="openPremiumLogin('${postName}', '${epLabel}')">Premium Login Direct Link</button>
+      `);
+    }
+
+    async function solveShortener(postName, epLabel) {
+      showModal(`<h3>Processing...</h3><p>Generating bypass key link, please wait.</p>`);
+      try {
+        const res = await fetch(`/api/shorten?post_name=${encodeURIComponent(postName)}&ep_label=${encodeURIComponent(epLabel)}`);
+        const data = await res.json();
+        if (data.shortLink) {
+          window.open(data.shortLink, "_blank");
+          closeModal();
+        } else {
+          alert("Error generating shortlink: " + data.error);
+          closeModal();
+        }
+      } catch (e) {
+        alert("Server error: " + e.message);
+        closeModal();
+      }
+    }
+
+    function openPremiumLogin(postName, epLabel) {
+      showModal(`
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <h3>Premium Member Authentication</h3>
+        <input type="text" id="pUser" placeholder="Enter Username">
+        <input type="password" id="pPass" placeholder="Enter Password">
+        <button class="full-width-btn" onclick="verifyPremium('${postName}', '${epLabel}')">Verify & Access</button>
+      `);
+    }
+
+    async function verifyPremium(postName, epLabel) {
+      const username = document.getElementById("pUser").value;
+      const password = document.getElementById("pPass").value;
+
+      try {
+        const res = await fetch("/api/premium-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password, post_name: postName, ep_label: epLabel })
+        });
+        const data = await res.json();
+        if (data.success && data.original_link) {
+          window.open(data.original_link, "_blank");
+          closeModal();
+        } else {
+          alert(data.error || "Aapka premium check fail ho gaya!");
+        }
+      } catch (e) {
+        alert("System error: " + e.message);
+      }
+    }
+
+    function showModal(html) {
+      const modal = document.getElementById("modal");
+      document.getElementById("modalContent").innerHTML = html;
+      modal.classList.add("active");
+    }
+
+    function closeModal() {
+      document.getElementById("modal").classList.remove("active");
+    }
+
+    function showHome() {
+      document.getElementById("postsGrid").style.display = "";
+      document.getElementById("gridTitle").style.display = "";
+      document.getElementById("gridTitle").innerText = "All Posts";
+      document.getElementById("detailPage").classList.remove("active");
+      renderPosts(allPosts);
+    }
+
+    function searchPosts() {
+      const term = document.getElementById("searchInput").value.toLowerCase();
+      const filtered = allPosts.filter(p => {
+        const matchName = p.name.toLowerCase().includes(term);
+        const matchGenre = parseGenres(p.genres).some(g => g.toLowerCase().includes(term));
+        return matchName || matchGenre;
+      });
+      renderPosts(filtered);
+    }
+
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("open");
+      document.getElementById("overlay").classList.toggle("show");
+    }
+
+    function showSidebarSection(type) {
+      toggleSidebar();
+      if (type === "category") {
+        const categories = [...new Set(allPosts.map(p => p.category).filter(Boolean))];
+        showModal(`
+          <span class="close-modal" onclick="closeModal()">&times;</span>
+          <h3 style="margin-bottom:15px;">Categories</h3>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${categories.map(cat => `<button class="full-width-btn" onclick="filterByCategory('${cat}')">${cat}</button>`).join("")}
+          </div>
+        `);
+      } else if (type === "genre") {
+        const allGenres = allPosts.flatMap(p => parseGenres(p.genres));
+        const uniqueGenres = [...new Set(allGenres)];
+        showModal(`
+          <span class="close-modal" onclick="closeModal()">&times;</span>
+          <h3 style="margin-bottom:15px;">Genres</h3>
+          <div style="display:flex; flex-direction:column; gap:10px; max-height:250px; overflow-y:auto; padding-right:10px;">
+            ${uniqueGenres.map(g => `<button class="full-width-btn" onclick="filterByGenre('${g}')">${g}</button>`).join("")}
+          </div>
+        `);
+      } else if (type === "az") {
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
+        showModal(`
+          <span class="close-modal" onclick="closeModal()">&times;</span>
+          <h3 style="margin-bottom:15px;">A2Z 0-9</h3>
+          <div style="display:grid; grid-template-columns: repeat(6, 1fr); gap:8px;">
+            ${letters.map(l => `<button style="width:100%; margin:0; padding:8px 0;" onclick="filterByLetter('${l}')">${l}</button>`).join("")}
+          </div>
+        `);
+      }
+    }
+
+    function filterByCategory(cat) {
+      closeModal();
+      document.getElementById("gridTitle").innerText = cat;
+      renderPosts(allPosts.filter(p => p.category === cat));
+    }
+
+    function filterByGenre(genre) {
+      closeModal();
+      document.getElementById("gridTitle").innerText = "Genre: " + genre;
+      renderPosts(allPosts.filter(p => parseGenres(p.genres).some(g => g.toLowerCase() === genre.toLowerCase())));
+    }
+
+    function filterByLetter(letter) {
+      closeModal();
+      document.getElementById("gridTitle").innerText = "Filter: " + letter;
+      renderPosts(allPosts.filter(p => p.name.toUpperCase().startsWith(letter)));
+    }
+
+    function showAllPosts() {
+      toggleSidebar();
+      showHome();
+    }
+
+    window.onload = loadApp;
+  </script>
+</body>
+</html>
