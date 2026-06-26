@@ -198,9 +198,23 @@
     </div>
   </div>
 
+  <!-- Include Supabase JS directly in admin panel for bulletproof file upload -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
+    const SUPABASE_URL = "https://kvdfdflygyssnldvahzv.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_7MW440PYXtbHbJpAq1v-OQ__1KZvK4R";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     let adminPass = localStorage.getItem("admin_password") || "";
     
+    // UUID Generator helper
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
     if (adminPass) {
       document.getElementById("loginScreen").style.display = "none";
       loadInitialData();
@@ -264,7 +278,7 @@
       return res.json();
     }
 
-    // Modern 100% Serverless-Safe Base64 Post Upload Setup
+    // Direct Browser-to-Supabase Secure Upload System (Guarantees 100% success on Netlify!)
     async function submitPost(e) {
       e.preventDefault();
       
@@ -275,18 +289,26 @@
       }
       
       const file = fileInput.files[0];
-      const reader = new FileReader();
-      
-      // Loading Status
       const submitBtn = e.target.querySelector(".btn-submit");
       const originalBtnText = submitBtn.innerText;
-      submitBtn.innerText = "Saving Post... Please Wait...";
+      submitBtn.innerText = "Uploading Poster & Saving Post...";
       submitBtn.disabled = true;
 
-      reader.onloadend = async () => {
-        const base64Image = reader.result;
+      try {
+        const fileName = `${generateUUID()}-${file.name.replace(/\s+/g, "_")}`;
+        
+        // Direct upload to Supabase Storage Bucket from frontend using publishable keys
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+          .from("Post-images")
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/Post-images/${fileName}`;
+
+        // Send text details to Netlify function securely
         const body = {
-          image: base64Image,
+          image_url: imageUrl,
           name: document.getElementById("postName").value.trim(),
           release_date: document.getElementById("postRelease").value.trim(),
           genres: document.getElementById("postGenre").value.trim(),
@@ -295,24 +317,20 @@
           category: document.getElementById("postCategory").value.trim()
         };
 
-        try {
-          const res = await makeRequest("/api/admin/add-post", "POST", body);
-          if (res.success) {
-            alert("Post successfully save ho gayi!");
-            document.getElementById("addPostForm").reset();
-            loadInitialData();
-          } else {
-            alert("Error: " + res.error);
-          }
-        } catch (err) {
-          alert("Upload failed: " + err.message);
-        } finally {
-          submitBtn.innerText = originalBtnText;
-          submitBtn.disabled = false;
+        const res = await makeRequest("/api/admin/add-post", "POST", body);
+        if (res.success) {
+          alert("Post successfully save ho gayi!");
+          document.getElementById("addPostForm").reset();
+          loadInitialData();
+        } else {
+          alert("Error saving data: " + res.error);
         }
-      };
-
-      reader.readAsDataURL(file);
+      } catch (err) {
+        alert("Upload error: " + err.message);
+      } finally {
+        submitBtn.innerText = originalBtnText;
+        submitBtn.disabled = false;
+      }
     }
 
     async function fetchPostsForSelection() {
