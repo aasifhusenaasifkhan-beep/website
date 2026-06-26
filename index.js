@@ -4,6 +4,7 @@ const { conversations, createConversation } = require("@grammyjs/conversations")
 const { createClient } = require("@supabase/supabase-js");
 const { v4: uuidv4 } = require("uuid");
 const fetch = require("node-fetch");
+const express = require("express");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -142,22 +143,21 @@ async function addPostConversation(conversation, ctx) {
   ctx.reply(`✅ Post "${name}" successfully add ho gayi!\nImage: ${imageUrl}`);
 }
 
-// Register all conversations
+// Register conversations
 bot.use(createConversation(addUserConversation));
 bot.use(createConversation(deleteUserConversation));
 bot.use(createConversation(addPostConversation));
 
-// Conversation entry commands
 bot.command("adduser", async (ctx) => { await ctx.conversation.enter("addUserConversation"); });
 bot.command("deleteuser", async (ctx) => { await ctx.conversation.enter("deleteUserConversation"); });
 bot.command("addpost", async (ctx) => { await ctx.conversation.enter("addPostConversation"); });
 
-// ==================== ADD EPISODE (Inline) ====================
+// ==================== ADD EPISODE ====================
 bot.command("addep", async (ctx) => {
   const text = ctx.match;
   if (!text) return ctx.reply("Format: /addep Naruto | Episode 01 | https://link.com");
   const parts = text.split("|").map(s => s.trim());
-  if (parts.length < 3) return ctx.reply("❌ Format galat. Post Name, Label, Link dijiye.");
+  if (parts.length < 3) return ctx.reply("❌ Format galat.");
   const [postName, label, link] = parts;
   const { data: post } = await supabase.from("posts").select("id").eq("name", postName).single();
   if (!post) return ctx.reply("❌ Post nahi mili.");
@@ -182,7 +182,7 @@ bot.command("selectpost", async (ctx) => {
   ctx.reply(msg);
 });
 
-// ==================== DELETE POST (Full) ====================
+// ==================== DELETE POST ====================
 bot.command("deletepost", async (ctx) => {
   const name = ctx.match;
   if (!name) return ctx.reply("Format: /deletepost Naruto");
@@ -266,6 +266,16 @@ bot.catch((err) => {
   console.error("Bot error:", err);
 });
 
-// ==================== START BOT ====================
-bot.start();
-console.log("Bot started...");
+// ==================== EXPRESS SERVER FOR PORT BINDING ====================
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+app.get("/", (req, res) => {
+  res.send("AnimeSubStudio Bot is running!");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  bot.start();
+  console.log("Bot started...");
+});
