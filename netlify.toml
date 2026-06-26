@@ -1,8 +1,8 @@
-[build]
-  publish = "public"
+@asi_anime (S01-02) kirio fanclub.mp4[build]
+  publish = "."
   functions = "netlify/functions"
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/index/:splat"
+  to = "/.netlify/functions/api/:splat"
   status = 200
