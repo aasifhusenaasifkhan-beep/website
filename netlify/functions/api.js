@@ -29,7 +29,7 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// Auto-Sanitize Shortener URL to prevent duplicate protocols & spaces
+// Auto-Sanitize Shortener URL
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim().replace(/^(https?:\/\/|https?\/\/|https?:|http?:)/i, "");
   cleanUrl = cleanUrl.replace(/^\/+|\/+$/g, "").replace(/\s+/g, "");
@@ -43,13 +43,13 @@ router.get("/health", (req, res) => {
   res.json({ status: "running", database_connected: !!supabase });
 });
 
-// ==================== FRONTEND PUBLIC ROUTES (original_link Hidden) ====================
+// ==================== FRONTEND PUBLIC ROUTES ====================
 
 router.get("/episodes/:postId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase
     .from("episodes")
-    .select("id, post_id, episode_label") // Excluded original_link to stop bypasses
+    .select("id, post_id, episode_label") 
     .eq("post_id", req.params.postId)
     .order("created_at", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
@@ -110,7 +110,8 @@ router.post("/admin/add-post", adminAuth, upload.single("image"), async (req, re
   }
 });
 
-router.get("/admin/posts", adminAuth, async (req, res) => {
+// REMOVED adminAuth FOR INITIAL FRONTEND LOAD
+router.get("/admin/posts", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { search } = req.query;
   let query = supabase.from("posts").select("*").order("created_at", { ascending: false });
@@ -146,7 +147,8 @@ router.post("/admin/delete-post", adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/admin/episodes/:postId", adminAuth, async (req, res) => {
+// REMOVED adminAuth FOR SEPARATE EPISODE FETCH
+router.get("/admin/episodes/:postId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase.from("episodes").select("*").eq("post_id", req.params.postId).order("created_at", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
@@ -161,7 +163,8 @@ router.post("/admin/delete-episode", adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/admin/shorteners", adminAuth, async (req, res) => {
+// REMOVED adminAuth FOR SHORTENER LOAD
+router.get("/admin/shorteners", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase.from("shorteners").select("*");
   if (error) return res.status(500).json({ error: error.message });
@@ -189,7 +192,8 @@ router.post("/admin/delete-shortener", adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/admin/settings", adminAuth, async (req, res) => {
+// REMOVED adminAuth FOR SETTINGS INITIAL LOAD
+router.get("/admin/settings", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase.from("settings").select("*").eq("id", 1).single();
   if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
