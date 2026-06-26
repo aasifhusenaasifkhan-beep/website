@@ -1,15 +1,16 @@
-// ==================== EXPRESS SERVER FOR PORT BINDING ====================
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-app.get("/", (req, res) => {
-  res.send("AnimeSubStudio Bot is running!");
-});
-
-// Important: 0.0.0.0 se listen karo, Render ko sab interface pe bind chahiye
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-  // Bot ko server ready hone ke baad start karo
-  bot.start();
-  console.log("Bot started...");
-});
+{
+  "name": "animesubstudio-system",
+  "version": "1.0.0",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
+    "uuid": "^9.0.0"
+  }
+}
