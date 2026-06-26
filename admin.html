@@ -53,6 +53,7 @@
     .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 100%; max-width: 500px; padding: 30px; position: relative; }
     .close-modal { position: absolute; top: 15px; right: 15px; font-size: 20px; cursor: pointer; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -198,8 +199,6 @@
     </div>
   </div>
 
-  <!-- Include Supabase JS directly in admin panel for bulletproof file upload -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = "https://kvdfdflygyssnldvahzv.supabase.co";
     const SUPABASE_KEY = "sb_publishable_7MW440PYXtbHbJpAq1v-OQ__1KZvK4R";
@@ -207,7 +206,7 @@
 
     let adminPass = localStorage.getItem("admin_password") || "";
     
-    // UUID Generator helper
+    // UUID generator helper
     function generateUUID() {
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
