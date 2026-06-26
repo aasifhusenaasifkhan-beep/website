@@ -27,7 +27,7 @@
     .overlay.show { display: block; }
 
     .section-title { padding: 30px 20px 10px 20px; font-size: 24px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--primary); font-weight: 800; }
-    .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; padding: 20px; }
+    .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; padding: 20px; }
     .post-card { background: rgba(26, 26, 26, 0.8); border-radius: 8px; overflow: hidden; position: relative; cursor: pointer; border: 1px solid var(--border); transition: 0.3s ease; }
     .post-card:hover { transform: translateY(-8px); border-color: var(--primary); box-shadow: 0 10px 20px rgba(229, 9, 20, 0.3); }
     .post-card img { width: 100%; height: 230px; object-fit: cover; }
@@ -108,7 +108,7 @@
     let settings = {};
 
     async function loadApp() {
-      // Direct post fetch from Supabase (Guarantees data loading even if Netlify configs aren't set!)
+      // Direct post fetch from Supabase
       const { data, error } = await supabaseClient.from("posts").select("*").order("created_at", { ascending: false });
       if (data) {
         allPosts = data;
@@ -308,7 +308,6 @@
       renderPosts(allPosts.filter(p => p.category === cat));
     }
 
-    // Filter search post
     function filterByGenre(genre) {
       closeModal();
       document.getElementById("gridTitle").innerText = "Genre: " + genre;
