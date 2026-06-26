@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AnimeSubStudio Admin Panel</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root { --bg: #0f0f0f; --panel: #1a1a1a; --primary: #e50914; --text: #ffffff; --border: #333; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: var(--bg); color: var(--text); overflow-x: hidden; }
+    
+    /* Login Screen */
+    #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 10000; }
+    .login-box { background: var(--panel); padding: 40px; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--border); }
+    .login-box h2 { color: var(--primary); margin-bottom: 20px; }
+    .login-box input { width: 100%; padding: 12px; margin-bottom: 20px; background: #2b2b2b; border: none; color: white; border-radius: 5px; font-size: 16px; text-align: center; }
+    .login-box button { background: var(--primary); color: white; width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+
+    /* Main Layout */
+    .header { background: var(--panel); padding: 15px 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+    .menu-toggle { font-size: 24px; cursor: pointer; margin-right: 20px; color: var(--primary); }
+    .site-name { font-size: 20px; font-weight: bold; }
+
+    /* Sidebar */
+    .sidebar { position: fixed; left: -280px; top: 0; height: 100%; width: 280px; background: var(--panel); z-index: 999; transition: 0.3s; padding-top: 80px; border-right: 1px solid var(--border); }
+    .sidebar.open { left: 0; }
+    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 998; }
+    .sidebar-overlay.show { display: block; }
+    .menu-item { display: flex; align-items: center; padding: 15px 25px; color: var(--text); text-decoration: none; cursor: pointer; font-size: 16px; transition: 0.2s; }
+    .menu-item i { margin-right: 15px; width: 20px; text-align: center; color: var(--primary); }
+    .menu-item:hover, .menu-item.active { background: #262626; }
+
+    /* Content Area */
+    .main-content { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    .section-card { background: var(--panel); padding: 30px; border-radius: 8px; border: 1px solid var(--border); display: none; }
+    .section-card.active { display: block; }
+    .section-card h3 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
+
+    /* Forms */
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; }
+    .form-control { width: 100%; padding: 12px; background: #252525; border: 1px solid var(--border); border-radius: 5px; color: white; font-size: 15px; }
+    textarea.form-control { height: 100px; resize: none; }
+    .btn-submit { background: var(--primary); color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+
+    /* Lists and Search */
+    .search-container { position: relative; margin-bottom: 20px; }
+    .search-container input { padding-left: 40px; }
+    .search-container i { position: absolute; left: 15px; top: 15px; color: #777; }
+    .scroll-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 5px; background: #151515; }
+    .list-item { padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .list-item:hover { background: #222; }
+    .delete-btn { background: #7c040a; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .delete-btn:hover { background: var(--primary); }
+
+    /* Modal inside Select Post */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1001; justify-content: center; align-items: center; padding: 20px; }
+    .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 100%; max-width: 500px; padding: 30px; position: relative; }
+    .close-modal { position: absolute; top: 15px; right: 15px; font-size: 20px; cursor: pointer; }
+    .loader { text-align: center; padding: 20px 0; display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Login Shield -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <h2>AnimeSubStudio Admin</h2>
+      <input type="password" id="adminPassInput" placeholder="Enter Admin Password">
+      <button onclick="attemptLogin()">Log In</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <span class="menu-toggle" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></span>
+    <span class="site-name">AnimeSubStudio Admin Portal</span>
+  </div>
+
+  <!-- Sidebar Overlay -->
+  <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+  <!-- Navigation Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="menu-item active" onclick="switchSection('addPostSec')"><i class="fa-solid fa-plus"></i> Add Post (01)</div>
+    <div class="menu-item" onclick="switchSection('selectPostSec')"><i class="fa-solid fa-magnifying-glass"></i> Select Post (02)</div>
+    <div class="menu-item" onclick="switchSection('deletePostSec')"><i class="fa-solid fa-trash-can"></i> Delete Post & Episodes (03)</div>
+    <div class="menu-item" onclick="switchSection('shortenersSec')"><i class="fa-solid fa-link"></i> Shortener System (04)</div>
+    <div class="menu-item" onclick="switchSection('linksSec')"><i class="fa-solid fa-circle-nodes"></i> Add Channel Link (05)</div>
+    <div class="menu-item" onclick="switchSection('premiumSec')"><i class="fa-solid fa-user-shield"></i> Premium Add (06)</div>
+  </div>
+
+  <!-- Content Sections -->
+  <div class="main-content">
+
+    <!-- 01. ADD POST -->
+    <div id="addPostSec" class="section-card active">
+      <h3>Add New Post</h3>
+      <form id="addPostForm" onsubmit="submitPost(event)">
+        <div class="form-group">
+          <label>Select Poster Image</label>
+          <input type="file" id="postImage" class="form-control" accept="image/*" required>
+        </div>
+        <div class="form-group">
+          <label>Post Name</label>
+          <input type="text" id="postName" class="form-control" placeholder="example: Naruto" required>
+        </div>
+        <div class="form-group">
+          <label>Release Date</label>
+          <input type="text" id="postRelease" class="form-control" placeholder="example: 01/01/2005" required>
+        </div>
+        <div class="form-group">
+          <label>Genre</label>
+          <input type="text" id="postGenre" class="form-control" placeholder="example: action, adventure, fantasy" required>
+        </div>
+        <div class="form-group">
+          <label>Season</label>
+          <input type="text" id="postSeason" class="form-control" placeholder="example: 02" required>
+        </div>
+        <div class="form-group">
+          <label>Short Story</label>
+          <textarea id="postStory" class="form-control" placeholder="Post ki brief kahani type karein..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Post Category</label>
+          <input type="text" id="postCategory" class="form-control" placeholder="example: Anime Hindi Sub" required>
+        </div>
+        <button type="submit" class="btn-submit">Save Post</button>
+      </form>
+    </div>
+
+    <!-- 02. SELECT POST (ADD EPISODE) -->
+    <div id="selectPostSec" class="section-card">
+      <h3>Select Post</h3>
+      <div class="search-container">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="searchPostInput" class="form-control" placeholder="Search Post Name..." oninput="fetchPostsForSelection()">
+      </div>
+      <div class="scroll-list" id="selectionList"></div>
+    </div>
+
+    <!-- 03. DELETE POST & EPISODES -->
+    <div id="deletePostSec" class="section-card">
+      <h3>Delete Post & Episodes</h3>
+      <div class="search-container">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="searchDeleteInput" class="form-control" placeholder="Search Post Name..." oninput="fetchPostsForDeletion()">
+      </div>
+      <div class="scroll-list" id="deletionList"></div>
+    </div>
+
+    <!-- 04. SHORTENERS SYSTEM -->
+    <div id="shortenersSec" class="section-card">
+      <h3>Shortener Accounts System</h3>
+      <div class="scroll-list" id="shortenerList" style="margin-bottom: 25px;"></div>
+      
+      <h4>Add Shortener Account (Max 3)</h4>
+      <form id="shortenerForm" onsubmit="submitShortener(event)" style="margin-top: 15px;">
+        <div class="form-group">
+          <label>Add Dashboard URL</label>
+          <input type="text" id="dashUrl" class="form-control" placeholder="example: gplinks.in" required>
+        </div>
+        <div class="form-group">
+          <label>Add API Key</label>
+          <input type="text" id="apiKey" class="form-control" placeholder="Paste api token key" required>
+        </div>
+        <button type="submit" class="btn-submit">Add Account</button>
+      </form>
+    </div>
+
+    <!-- 05. ADD CHANNEL & GROUP LINK -->
+    <div id="linksSec" class="section-card">
+      <h3>Channel & Group Settings</h3>
+      <form id="settingsForm" onsubmit="submitSettings(event)">
+        <div class="form-group">
+          <label>Add Channel Link</label>
+          <input type="url" id="chanLink" class="form-control" placeholder="https://t.me/channel_link" required>
+        </div>
+        <div class="form-group">
+          <label>Add Group Link</label>
+          <input type="url" id="groupLink" class="form-control" placeholder="https://t.me/group_link" required>
+        </div>
+        <button type="submit" class="btn-submit">Save Links</button>
+      </form>
+    </div>
+
+    <!-- 06. PREMIUM USER ADD -->
+    <div id="premiumSec" class="section-card">
+      <h3>Add Premium User (28 Days Expiry)</h3>
+      <form id="premiumForm" onsubmit="submitPremium(event)">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="premUser" class="form-control" placeholder="Unique username" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="text" id="premPass" class="form-control" placeholder="Unique password" required>
+        </div>
+        <button type="submit" class="btn-submit">Generate Premium User</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Modal for Episode Operations -->
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <span class="close-modal" onclick="closeModal()">&times;</span>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script>
+    let adminPass = localStorage.getItem("admin_password") || "";
+    
+    if (adminPass) {
+      document.getElementById("loginScreen").style.display = "none";
+      loadInitialData();
+    }
+
+    async function attemptLogin() {
+      const pass = document.getElementById("adminPassInput").value;
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pass })
+      });
+      const data = await res.json();
+      if (data.success) {
+        adminPass = pass;
+        localStorage.setItem("admin_password", pass);
+        document.getElementById("loginScreen").style.display = "none";
+        loadInitialData();
+      } else {
+        alert(data.error);
+      }
+    }
+
+    function loadInitialData() {
+      fetchPostsForSelection();
+      fetchPostsForDeletion();
+      fetchShorteners();
+      fetchSettings();
+    }
+
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("open");
+      document.getElementById("overlay").classList.toggle("show");
+    }
+
+    function switchSection(secId) {
+      document.querySelectorAll(".section-card").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("active"));
+      document.getElementById(secId).classList.add("active");
+      
+      // Highlight Menu Item
+      const activeIdx = Array.from(document.getElementById("sidebar").children).findIndex(el => el.getAttribute('onclick').includes(secId));
+      if(activeIdx !== -1) document.getElementById("sidebar").children[activeIdx].classList.add("active");
+      
+      toggleSidebar();
+    }
+
+    async function makeRequest(url, method = "GET", body = null, isFormData = false) {
+      const headers = { "Authorization": adminPass };
+      if (!isFormData) headers["Content-Type"] = "application/json";
+      
+      const options = { method, headers };
+      if (body) options.body = isFormData ? body : JSON.stringify(body);
+
+      const res = await fetch(url, options);
+      if (res.status === 401) {
+        alert("Session Expired or Galat Password!");
+        localStorage.removeItem("admin_password");
+        location.reload();
+        return;
+      }
+      return res.json();
+    }
+
+    // --- 01. SUBMIT POST ---
+    async function submitPost(e) {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append("image", document.getElementById("postImage").files[0]);
+      formData.append("name", document.getElementById("postName").value.trim());
+      formData.append("release_date", document.getElementById("postRelease").value.trim());
+      formData.append("genres", document.getElementById("postGenre").value.trim());
+      formData.append("season", document.getElementById("postSeason").value.trim());
+      formData.append("short_story", document.getElementById("postStory").value.trim());
+      formData.append("category", document.getElementById("postCategory").value.trim());
+
+      const res = await makeRequest("/api/admin/add-post", "POST", formData, true);
+      if (res.success) {
+        alert("Post successfully save ho gayi!");
+        document.getElementById("addPostForm").reset();
+        loadInitialData();
+      } else {
+        alert("Error: " + res.error);
+      }
+    }
+
+    // --- 02. SELECT POST (ADD EPISODE) ---
+    async function fetchPostsForSelection() {
+      const search = document.getElementById("searchPostInput").value;
+      const data = await makeRequest(`/api/admin/posts?search=${encodeURIComponent(search)}`);
+      const container = document.getElementById("selectionList");
+      container.innerHTML = data.map(post => `
+        <div class="list-item" onclick="openEpisodeModal('${post.id}', '${post.name}')">
+          <span>${post.name}</span>
+          <i class="fa-solid fa-circle-arrow-right" style="color: var(--primary);"></i>
+        </div>
+      `).join("");
+    }
+
+    function openEpisodeModal(postId, postName) {
+      document.getElementById("modalContent").innerHTML = `
+        <h3 style="margin-bottom: 20px;">Manage Episodes for "${postName}"</h3>
+        <form onsubmit="submitEpisode(event, '${postId}')">
+          <div class="form-group">
+            <label>Episode/OVA Number</label>
+            <input type="text" id="epLabel" class="form-control" placeholder="example: 01 ya OVA 01" required>
+          </div>
+          <div class="form-group">
+            <label>Download Original Link</label>
+            <input type="url" id="epLink" class="form-control" placeholder="https://..." required>
+          </div>
+          <button type="submit" class="btn-submit">Save Episode</button>
+        </form>
+      `;
+      document.getElementById("modal").style.display = "flex";
+    }
+
+    async function submitEpisode(e, postId) {
+      e.preventDefault();
+      const labelValue = document.getElementById("epLabel").value.trim();
+      const epLabel = isNaN(labelValue) ? labelValue : "EPISODE " + String(labelValue).padStart(2, '0');
+      const original_link = document.getElementById("epLink").value.trim();
+
+      const res = await makeRequest("/api/admin/add-episode", "POST", { post_id: postId, episode_label: epLabel, original_link });
+      if (res.success) {
+        alert("Episode successfully add ho gaya!");
+        closeModal();
+      } else {
+        alert("Error: " + res.error);
+      }
+    }
+
+    // --- 03. DELETE POST & EPISODES ---
+    async function fetchPostsForDeletion() {
+      const search = document.getElementById("searchDeleteInput").value;
+      const data = await makeRequest(`/api/admin/posts?search=${encodeURIComponent(search)}`);
+      const container = document.getElementById("deletionList");
+      container.innerHTML = data.map(post => `
+        <div class="list-item" onclick="openDeleteModal('${post.id}', '${post.name}')">
+          <span>${post.name}</span>
+          <span style="color: #777; font-size:13px;">Manage <i class="fa-solid fa-chevron-right"></i></span>
+        </div>
+      `).join("");
+    }
+
+    async function openDeleteModal(postId, postName) {
+      document.getElementById("modalContent").innerHTML = `
+        <h3 style="margin-bottom: 10px;">Delete: ${postName}</h3>
+        <button class="delete-btn" style="width: 100%; padding: 10px; margin-bottom: 20px;" onclick="deleteFullPost('${postId}')">DELETE FULL POST (With All Episodes)</button>
+        <h4>Delete Episodes Separately:</h4>
+        <div class="scroll-list" id="epListToDelete" style="margin-top:10px; max-height:200px;">Loading episodes...</div>
+      `;
+      document.getElementById("modal").style.display = "flex";
+
+      // Load episodes
+      const episodes = await makeRequest(`/api/admin/episodes/${postId}`);
+      const container = document.getElementById("epListToDelete");
+      if (episodes.length === 0) {
+        container.innerHTML = "<div style='padding:15px; color:#777;'>Koi episodes add nahi hain.</div>";
+      } else {
+        container.innerHTML = episodes.map(ep => `
+          <div class="list-item" style="padding:10px 15px;">
+            <span>${ep.episode_label}</span>
+            <button class="delete-btn" onclick="deleteSingleEpisode('${ep.id}', '${postId}', '${postName}')">Delete</button>
+          </div>
+        `).join("");
+      }
+    }
+
+    async function deleteFullPost(postId) {
+      if (confirm("Kya aap sach mein poori Post aur uske saare Episodes delete karna chahte hain?")) {
+        const res = await makeRequest("/api/admin/delete-post", "POST", { post_id: postId });
+        if (res.success) {
+          alert("Post delete ho gayi.");
+          closeModal();
+          fetchPostsForDeletion();
+          fetchPostsForSelection();
+        }
+      }
+    }
+
+    async function deleteSingleEpisode(epId, postId, postName) {
+      if (confirm("Kya aap is episode ko delete karna chahte hain?")) {
+        const res = await makeRequest("/api/admin/delete-episode", "POST", { episode_id: epId });
+        if (res.success) {
+          alert("Episode delete ho gaya.");
+          openDeleteModal(postId, postName); // reload modal content
+        }
+      }
+    }
+
+    // --- 04. SHORTENERS SYSTEM ---
+    async function fetchShorteners() {
+      const data = await makeRequest("/api/admin/shorteners");
+      const container = document.getElementById("shortenerList");
+      if(data.length === 0) {
+        container.innerHTML = "<div style='padding:15px; color:#777; text-align:center;'>Koi shortener configured nahi hai. Direct link serve ho rahi hai.</div>";
+      } else {
+        container.innerHTML = data.map((sh, idx) => `
+          <div class="list-item">
+            <div>
+              <strong>Shortener 0${idx+1}</strong><br>
+              <small>${sh.dashboard_url}</small>
+            </div>
+            <button class="delete-btn" onclick="deleteShortener('${sh.id}')">Delete</button>
+          </div>
+        `).join("");
+      }
+    }
+
+    async function submitShortener(e) {
+      e.preventDefault();
+      const body = {
+        dashboard_url: document.getElementById("dashUrl").value.trim(),
+        api_key: document.getElementById("apiKey").value.trim()
+      };
+      const res = await makeRequest("/api/admin/add-shortener", "POST", body);
+      if (res.success) {
+        alert("Shortener accounts system updated!");
+        document.getElementById("shortenerForm").reset();
+        fetchShorteners();
+      } else {
+        alert("Error: " + res.error);
+      }
+    }
+
+    async function deleteShortener(id) {
+      if (confirm("Kya aap is shortener aur iski API key ko delete karna chahte hain?")) {
+        const res = await makeRequest("/api/admin/delete-shortener", "POST", { id });
+        if (res.success) {
+          alert("Shortener deleted.");
+          fetchShorteners();
+        }
+      }
+    }
+
+    // --- 05. SETTINGS (CHANNEL & GROUP LINKS) ---
+    async function fetchSettings() {
+      const data = await makeRequest("/api/admin/settings");
+      document.getElementById("chanLink").value = data.channel_link || "";
+      document.getElementById("groupLink").value = data.group_link || "";
+    }
+
+    async function submitSettings(e) {
+      e.preventDefault();
+      const body = {
+        channel_link: document.getElementById("chanLink").value.trim(),
+        group_link: document.getElementById("groupLink").value.trim()
+      };
+      const res = await makeRequest("/api/admin/save-settings", "POST", body);
+      if (res.success) {
+        alert("Links safely updated!");
+      } else {
+        alert("Error: " + res.error);
+      }
+    }
+
+    // --- 06. PREMIUM USER ADD ---
+    async function submitPremium(e) {
+      e.preventDefault();
+      const body = {
+        username: document.getElementById("premUser").value.trim(),
+        password: document.getElementById("premPass").value.trim()
+      };
+      const res = await makeRequest("/api/admin/add-premium", "POST", body);
+      if (res.success) {
+        alert(`Premium Account set kiya gaya!\nUsername: ${body.username}\nValid for: 28 Days\nExpires on: ${new Date(res.expires_at).toLocaleDateString()}`);
+        document.getElementById("premiumForm").reset();
+      } else {
+        alert("Error: " + res.error);
+      }
+    }
+
+    function closeModal() { document.getElementById("modal").style.display = "none"; }
+  </script>
+</body>
+</html>
