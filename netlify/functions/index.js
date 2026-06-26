@@ -1,13 +1,12 @@
 const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
-const { v4: uuidv4 } = require("uuid");
 const fetch = require("node-fetch");
 const serverless = require("serverless-http");
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "10mb" })); // Increased limit to support base64 images safely
+app.use(express.json());
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
@@ -26,7 +25,7 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// Clean Dashboard URL space and protocol helper
+// Auto-Sanitize helper
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim().replace(/^(https?:\/\/|https?\/\/|https?:|http?:)/i, "");
   cleanUrl = cleanUrl.replace(/^\/+|\/+$/g, "").replace(/\s+/g, "");
@@ -40,40 +39,20 @@ router.get("/health", (req, res) => {
   res.json({ status: "running", database_connected: !!supabase });
 });
 
-// ==================== FRONTEND PUBLIC ROUTES (NO EXPOSED RAW LINKS) ====================
-
-router.get("/posts", async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { search } = req.query;
-  let query = supabase.from("posts").select("*").order("created_at", { ascending: false });
-  if (search) {
-    query = query.ilike("name", `%${search}%`);
-  }
-  const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
+// ==================== FRONTEND SECURE ENDPOINTS (original_link Hidden) ====================
 
 router.get("/episodes/:postId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  // Selecting safe fields - original_link is omitted to block browser inspect bypasses
   const { data, error } = await supabase
     .from("episodes")
-    .select("id, post_id, episode_label")
+    .select("id, post_id, episode_label") // Excluded original_link to stop bypasses
     .eq("post_id", req.params.postId)
     .order("created_at", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-router.get("/settings", async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { data, error } = await supabase.from("settings").select("channel_link, group_link").eq("id", 1).single();
-  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
-  res.json(data || { channel_link: "", group_link: "" });
-});
-
-// ==================== SECURE ADMIN CHANNELS (adminAuth locks) ====================
+// ==================== ADMIN OPERATIONS ====================
 
 router.post("/admin/login", (req, res) => {
   const { password } = req.body;
@@ -83,37 +62,16 @@ router.post("/admin/login", (req, res) => {
   return res.status(401).json({ error: "Galat Password!" });
 });
 
-// 100% Serverless-safe Base64 Image Upload
+// Clean text save route (Bypasses Multer timeout completely!)
 router.post("/admin/add-post", adminAuth, async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ error: "Database not connected" });
-    const { image, name, release_date, genres, season, short_story, category } = req.body;
-    if (!image) return res.status(400).json({ error: "Poster image is mandatory" });
-
-    // Parse Base64 Image string safely
-    const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return res.status(400).json({ error: "Invalid image format uploaded" });
-    }
-    const mimeType = matches[1];
-    const fileBuffer = Buffer.from(matches[2], 'base64');
-
-    const fileName = `${uuidv4()}.jpg`;
-    const { error: uploadError } = await supabase.storage
-      .from("Post-images")
-      .upload(fileName, fileBuffer, { contentType: mimeType, duplex: "half" });
-
-    if (uploadError) throw uploadError;
-    const imageUrl = supabase.storage.from("Post-images").getPublicUrl(fileName).data.publicUrl;
+    const { image_url, name, release_date, genres, season, short_story, category } = req.body;
+    
+    if (!image_url) return res.status(400).json({ error: "Image URL missing" });
 
     const { data: postData, error: dbError } = await supabase.from("posts").insert({
-      name, 
-      image_url: imageUrl, 
-      release_date, 
-      genres, 
-      season, 
-      short_story, 
-      category
+      name, image_url, release_date, genres, season, short_story, category
     }).select();
 
     if (dbError) throw dbError;
@@ -217,7 +175,7 @@ router.post("/admin/add-premium", adminAuth, async (req, res) => {
   res.json({ success: true, expires_at });
 });
 
-// ==================== SHORTLINK ROTATOR & PREMIUM VERIFICATION ====================
+// ==================== SECURE SHORTENER DYNAMIC DECRYPTOR ====================
 
 router.get("/shorten", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
