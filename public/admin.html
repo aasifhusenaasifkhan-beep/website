@@ -38,7 +38,6 @@
     .form-control { width: 100%; padding: 12px; background: #252525; border: 1px solid var(--border); border-radius: 5px; color: white; font-size: 15px; }
     textarea.form-control { height: 100px; resize: none; }
     .btn-submit { background: var(--primary); color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
-    .btn-submit:disabled { background: #555; cursor: not-allowed; }
 
     .search-container { position: relative; margin-bottom: 20px; }
     .search-container input { padding-left: 40px; }
@@ -52,6 +51,7 @@
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1001; justify-content: center; align-items: center; padding: 20px; }
     .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 100%; max-width: 500px; padding: 30px; position: relative; }
     .close-modal { position: absolute; top: 15px; right: 15px; font-size: 20px; cursor: pointer; }
+    .loader { text-align: center; padding: 20px 0; display: none; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -205,18 +205,12 @@
     </div>
   </div>
 
-  <!-- Direct upload logic built-in to prevent serverless multer crashes -->
   <script>
-    const SUPABASE_URL = "https://kvdfdflygyssnldvahzv.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_7MW440PYXtbHbJpAq1v-OQ__1KZvK4R";
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // UUID generator
-    function generateUUID() {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
+    let adminPass = localStorage.getItem("admin_password") || "";
+    
+    if (adminPass) {
+      document.getElementById("loginScreen").style.display = "none";
+      loadInitialData();
     }
 
     async function attemptLogin() {
@@ -277,58 +271,24 @@
       return res.json();
     }
 
-    // Direct Browser-to-Supabase Secure Upload System (Never fails on Netlify!)
     async function submitPost(e) {
       e.preventDefault();
-      
-      const fileInput = document.getElementById("postImage");
-      if (!fileInput.files.length) {
-        alert("Please select a poster image!");
-        return;
-      }
-      
-      const file = fileInput.files[0];
-      const submitBtn = e.target.querySelector(".btn-submit");
-      const originalBtnText = submitBtn.innerText;
-      submitBtn.innerText = "Uploading Poster & Saving Post...";
-      submitBtn.disabled = true;
+      const formData = new FormData();
+      formData.append("image", document.getElementById("postImage").files[0]);
+      formData.append("name", document.getElementById("postName").value.trim());
+      formData.append("release_date", document.getElementById("postRelease").value.trim());
+      formData.append("genres", document.getElementById("postGenre").value.trim());
+      formData.append("season", document.getElementById("postSeason").value.trim());
+      formData.append("short_story", document.getElementById("postStory").value.trim());
+      formData.append("category", document.getElementById("postCategory").value.trim());
 
-      try {
-        const fileName = `${generateUUID()}-${file.name.replace(/\s+/g, "_")}`;
-        
-        // Direct upload to Supabase Storage Bucket from frontend using publishable keys
-        const { data: uploadData, error: uploadError } = await supabaseClient.storage
-          .from("Post-images")
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/Post-images/${fileName}`;
-
-        // Send text details to Netlify function securely
-        const body = {
-          image_url: imageUrl,
-          name: document.getElementById("postName").value.trim(),
-          release_date: document.getElementById("postRelease").value.trim(),
-          genres: document.getElementById("postGenre").value.trim(),
-          season: document.getElementById("postSeason").value.trim(),
-          short_story: document.getElementById("postStory").value.trim(),
-          category: document.getElementById("postCategory").value.trim()
-        };
-
-        const res = await makeRequest("/api/admin/add-post", "POST", body);
-        if (res.success) {
-          alert("Post successfully save ho gayi!");
-          document.getElementById("addPostForm").reset();
-          loadInitialData();
-        } else {
-          alert("Error saving data: " + res.error);
-        }
-      } catch (err) {
-        alert("Upload error: " + err.message);
-      } finally {
-        submitBtn.innerText = originalBtnText;
-        submitBtn.disabled = false;
+      const res = await makeRequest("/api/admin/add-post", "POST", formData, true);
+      if (res.success) {
+        alert("Post successfully save ho gayi!");
+        document.getElementById("addPostForm").reset();
+        loadInitialData();
+      } else {
+        alert("Error: " + res.error);
       }
     }
 
