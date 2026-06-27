@@ -1,6 +1,7 @@
 {
-  "name": "animesubstudio-api",
+  "name": "animesubstudio-system",
   "version": "1.0.0",
+  "main": "api.js",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "cors": "^2.8.5",
