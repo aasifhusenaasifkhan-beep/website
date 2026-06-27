@@ -5,63 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AnimeSubStudio Admin Panel</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    :root { --bg: #0f0f0f; --panel: #1a1a1a; --primary: #e50914; --text: #ffffff; --border: #333; }
+    :root { 
+      --bg: #09090c; 
+      --panel: #13131a; 
+      --primary: #ff1e27; 
+      --primary-hover: #e50914; 
+      --text: #f5f5f7; 
+      --border: #22222d; 
+      --accent-glow: rgba(255, 30, 39, 0.15);
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background: var(--bg); color: var(--text); overflow-x: hidden; }
     
+    /* Login Screen */
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 10000; }
-    .login-box { background: var(--panel); padding: 40px; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--border); }
-    .login-box h2 { color: var(--primary); margin-bottom: 20px; }
-    .login-box input { width: 100%; padding: 12px; margin-bottom: 20px; background: #2b2b2b; border: none; color: white; border-radius: 5px; font-size: 16px; text-align: center; }
-    .login-box button { background: var(--primary); color: white; width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+    .login-box { background: var(--panel); padding: 40px; border-radius: 12px; width: 90%; max-width: 420px; text-align: center; border: 1px solid var(--border); box-shadow: 0 8px 32px var(--accent-glow); }
+    .login-box h2 { color: var(--primary); margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 1px; }
+    .login-box input { width: 100%; padding: 14px; margin-bottom: 20px; background: #1c1c24; border: 1px solid var(--border); color: white; border-radius: 8px; font-size: 16px; text-align: center; outline: none; transition: 0.2s; }
+    .login-box input:focus { border-color: var(--primary); box-shadow: 0 0 10px var(--accent-glow); }
+    .login-box button { background: var(--primary); color: white; width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+    .login-box button:hover { background: var(--primary-hover); transform: translateY(-1px); }
 
-    .header { background: var(--panel); padding: 15px 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border); }
-    .menu-toggle { font-size: 24px; cursor: pointer; margin-right: 20px; color: var(--primary); }
-    .site-name { font-size: 20px; font-weight: bold; }
+    /* Layout & Header */
+    .header { background: var(--panel); padding: 15px 25px; display: flex; align-items: center; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 900; }
+    .menu-toggle { font-size: 24px; cursor: pointer; margin-right: 20px; color: var(--primary); transition: 0.2s; }
+    .menu-toggle:hover { transform: scale(1.1); }
+    .site-name { font-size: 20px; font-weight: 800; letter-spacing: 1.5px; color: #fff; text-shadow: 0 0 10px var(--accent-glow); }
 
-    .sidebar { position: fixed; left: -280px; top: 0; height: 100%; width: 280px; background: var(--panel); z-index: 999; transition: 0.3s; padding-top: 80px; border-right: 1px solid var(--border); }
+    /* Sidebar Drawer */
+    .sidebar { position: fixed; left: -290px; top: 0; height: 100%; width: 290px; background: var(--panel); z-index: 999; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding-top: 80px; border-right: 1px solid var(--border); }
     .sidebar.open { left: 0; }
-    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 998; }
+    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 998; backdrop-filter: blur(4px); }
     .sidebar-overlay.show { display: block; }
-    .menu-item { display: flex; align-items: center; padding: 15px 25px; color: var(--text); text-decoration: none; cursor: pointer; font-size: 16px; transition: 0.2s; }
-    .menu-item i { margin-right: 15px; width: 20px; text-align: center; color: var(--primary); }
-    .menu-item:hover, .menu-item.active { background: #262626; }
+    .menu-item { display: flex; align-items: center; padding: 16px 25px; color: var(--text); text-decoration: none; cursor: pointer; font-size: 15px; font-weight: 600; transition: 0.2s; border-left: 4px solid transparent; }
+    .menu-item i { margin-right: 15px; width: 20px; text-align: center; color: var(--primary); font-size: 17px; }
+    .menu-item:hover, .menu-item.active { background: #1c1c24; border-left-color: var(--primary); color: #fff; }
 
+    /* Central Workspace */
     .main-content { max-width: 800px; margin: 40px auto; padding: 0 20px; }
-    .section-card { background: var(--panel); padding: 30px; border-radius: 8px; border: 1px solid var(--border); display: none; }
-    .section-card.active { display: block; }
-    .section-card h3 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
+    .section-card { background: var(--panel); padding: 35px; border-radius: 12px; border: 1px solid var(--border); display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    .section-card.active { display: block; animation: fadeInUp 0.4s ease-out; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    .section-card h3 { border-bottom: 2px solid var(--primary); padding-bottom: 12px; margin-bottom: 25px; font-size: 22px; font-weight: 800; text-transform: uppercase; color: #fff; }
 
-    .form-group { margin-bottom: 20px; }
-    .form-group label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; }
-    .form-control { width: 100%; padding: 12px; background: #252525; border: 1px solid var(--border); border-radius: 5px; color: white; font-size: 15px; }
-    textarea.form-control { height: 100px; resize: none; }
-    .btn-submit { background: var(--primary); color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+    /* Forms inputs */
+    .form-group { margin-bottom: 22px; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-control { width: 100%; padding: 12px 15px; background: #181822; border: 1px solid var(--border); border-radius: 8px; color: white; font-size: 15px; outline: none; transition: 0.2s; }
+    .form-control:focus { border-color: var(--primary); box-shadow: 0 0 8px var(--accent-glow); }
+    textarea.form-control { height: 120px; resize: none; }
+    .btn-submit { background: var(--primary); color: white; padding: 14px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 16px; transition: 0.2s; text-transform: uppercase; }
+    .btn-submit:hover { background: var(--primary-hover); box-shadow: 0 4px 15px var(--accent-glow); }
+    .btn-submit:disabled { background: #555 !important; cursor: not-allowed; box-shadow: none; }
 
+    /* Lists styling */
     .search-container { position: relative; margin-bottom: 20px; }
-    .search-container input { padding-left: 40px; }
-    .search-container i { position: absolute; left: 15px; top: 15px; color: #777; }
-    .scroll-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 5px; background: #151515; }
-    .list-item { padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-    .list-item:hover { background: #222; }
-    .delete-btn { background: #7c040a; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .search-container input { padding-left: 45px; }
+    .search-container i { position: absolute; left: 15px; top: 15px; color: #777; font-size: 16px; }
+    .scroll-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #0c0c10; }
+    .list-item { padding: 16px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+    .list-item:hover { background: #181822; }
+    .delete-btn { background: #7c040a; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; }
     .delete-btn:hover { background: var(--primary); }
 
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1001; justify-content: center; align-items: center; padding: 20px; }
-    .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 100%; max-width: 500px; padding: 30px; position: relative; }
-    .close-modal { position: absolute; top: 15px; right: 15px; font-size: 20px; cursor: pointer; }
-    .loader { text-align: center; padding: 20px 0; display: none; }
+    /* Modals CSS Overlay */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1001; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(5px); }
+    .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 520px; padding: 35px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+    .close-modal { position: absolute; top: 18px; right: 20px; font-size: 24px; cursor: pointer; color: #777; transition: 0.2s; }
+    .close-modal:hover { color: var(--primary); }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
   <!-- Login Shield -->
   <div id="loginScreen">
     <div class="login-box">
-      <h2>AnimeSubStudio Admin</h2>
-      <input type="password" id="adminPassInput" placeholder="Enter Admin Password">
+      <h2>ANIMESUBSTUDIO</h2>
+      <input type="password" id="adminPassInput" placeholder="ENTER ADMIN PASSWORD">
       <button onclick="attemptLogin()">Log In</button>
     </div>
   </div>
@@ -69,7 +91,7 @@
   <!-- Header -->
   <div class="header">
     <span class="menu-toggle" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></span>
-    <span class="site-name">AnimeSubStudio Admin Portal</span>
+    <span class="site-name">ANIMESUBSTUDIO CONTROL ROOM</span>
   </div>
 
   <!-- Sidebar Overlay -->
@@ -85,51 +107,51 @@
     <div class="menu-item" onclick="switchSection('premiumSec')"><i class="fa-solid fa-user-shield"></i> Premium Add (06)</div>
   </div>
 
-  <!-- Content Sections -->
+  <!-- Workspace content -->
   <div class="main-content">
 
     <!-- 01. ADD POST -->
     <div id="addPostSec" class="section-card active">
-      <h3>Add New Post</h3>
+      <h3>Add New Anime Post</h3>
       <form id="addPostForm" onsubmit="submitPost(event)">
         <div class="form-group">
           <label>Select Poster Image</label>
           <input type="file" id="postImage" class="form-control" accept="image/*" required>
         </div>
         <div class="form-group">
-          <label>Post Name</label>
-          <input type="text" id="postName" class="form-control" placeholder="example: Naruto" required>
+          <label>Anime Post Name</label>
+          <input type="text" id="postName" class="form-control" placeholder="example: Naruto Shippuden" required>
         </div>
         <div class="form-group">
           <label>Release Date</label>
-          <input type="text" id="postRelease" class="form-control" placeholder="example: 01/01/2005" required>
+          <input type="text" id="postRelease" class="form-control" placeholder="example: 15/02/2007" required>
         </div>
         <div class="form-group">
-          <label>Genre</label>
-          <input type="text" id="postGenre" class="form-control" placeholder="example: action, adventure, fantasy" required>
+          <label>Genres (Separate with commas)</label>
+          <input type="text" id="postGenre" class="form-control" placeholder="example: Action, Adventure, Shounen" required>
         </div>
         <div class="form-group">
           <label>Season</label>
-          <input type="text" id="postSeason" class="form-control" placeholder="example: 02" required>
+          <input type="text" id="postSeason" class="form-control" placeholder="example: 01" required>
         </div>
         <div class="form-group">
-          <label>Short Story</label>
-          <textarea id="postStory" class="form-control" placeholder="Post ki brief kahani type karein..." required></textarea>
+          <label>Short Story / Description</label>
+          <textarea id="postStory" class="form-control" placeholder="Type brief explanation here..." required></textarea>
         </div>
         <div class="form-group">
           <label>Post Category</label>
           <input type="text" id="postCategory" class="form-control" placeholder="example: Anime Hindi Sub" required>
         </div>
-        <button type="submit" class="btn-submit">Save Post</button>
+        <button type="submit" id="savePostBtn" class="btn-submit">Save Anime Post</button>
       </form>
     </div>
 
     <!-- 02. SELECT POST (ADD EPISODE) -->
     <div id="selectPostSec" class="section-card">
-      <h3>Select Post</h3>
+      <h3>Select Anime Post</h3>
       <div class="search-container">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="searchPostInput" class="form-control" placeholder="Search Post Name..." oninput="fetchPostsForSelection()">
+        <input type="text" id="searchPostInput" class="form-control" placeholder="Search Anime Post..." oninput="fetchPostsForSelection()">
       </div>
       <div class="scroll-list" id="selectionList"></div>
     </div>
@@ -146,58 +168,58 @@
 
     <!-- 04. SHORTENERS SYSTEM -->
     <div id="shortenersSec" class="section-card">
-      <h3>Shortener Accounts System</h3>
+      <h3>Shortener Accounts (Max 3)</h3>
       <div class="scroll-list" id="shortenerList" style="margin-bottom: 25px;"></div>
       
-      <h4>Add Shortener Account (Max 3)</h4>
+      <h4>Add Shortener Key</h4>
       <form id="shortenerForm" onsubmit="submitShortener(event)" style="margin-top: 15px;">
         <div class="form-group">
-          <label>Add Dashboard URL</label>
+          <label>Dashboard URL</label>
           <input type="text" id="dashUrl" class="form-control" placeholder="example: gplinks.in" required>
         </div>
         <div class="form-group">
-          <label>Add API Key</label>
-          <input type="text" id="apiKey" class="form-control" placeholder="Paste api token key" required>
+          <label>API Key Token</label>
+          <input type="text" id="apiKey" class="form-control" placeholder="Paste API token key" required>
         </div>
         <button type="submit" class="btn-submit">Add Account</button>
       </form>
     </div>
 
-    <!-- 05. ADD CHANNEL & GROUP LINK -->
+    <!-- 05. SETTINGS -->
     <div id="linksSec" class="section-card">
-      <h3>Channel & Group Settings</h3>
+      <h3>Channel & Group Customizer</h3>
       <form id="settingsForm" onsubmit="submitSettings(event)">
         <div class="form-group">
-          <label>Add Channel Link</label>
-          <input type="url" id="chanLink" class="form-control" placeholder="https://t.me/channel_link" required>
+          <label>Official Telegram Channel Link</label>
+          <input type="url" id="chanLink" class="form-control" placeholder="https://t.me/yourchannel" required>
         </div>
         <div class="form-group">
-          <label>Add Group Link</label>
-          <input type="url" id="groupLink" class="form-control" placeholder="https://t.me/group_link" required>
+          <label>Support Telegram Group Link</label>
+          <input type="url" id="groupLink" class="form-control" placeholder="https://t.me/yourgroup" required>
         </div>
-        <button type="submit" class="btn-submit">Save Links</button>
+        <button type="submit" class="btn-submit">Save Configurations</button>
       </form>
     </div>
 
-    <!-- 06. PREMIUM USER ADD -->
+    <!-- 06. PREMIUM MEMBERS -->
     <div id="premiumSec" class="section-card">
-      <h3>Add Premium User (28 Days Expiry)</h3>
+      <h3>Add Premium User (28 Days Limit)</h3>
       <form id="premiumForm" onsubmit="submitPremium(event)">
         <div class="form-group">
           <label>Username</label>
-          <input type="text" id="premUser" class="form-control" placeholder="Unique username" required>
+          <input type="text" id="premUser" class="form-control" placeholder="Assign unique username" required>
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="text" id="premPass" class="form-control" placeholder="Unique password" required>
+          <input type="text" id="premPass" class="form-control" placeholder="Assign unique password" required>
         </div>
-        <button type="submit" class="btn-submit">Generate Premium User</button>
+        <button type="submit" class="btn-submit">Generate Premium Account</button>
       </form>
     </div>
 
   </div>
 
-  <!-- Modal for Episode Operations -->
+  <!-- Dynamic Modal Overlay -->
   <div class="modal" id="modal">
     <div class="modal-box">
       <span class="close-modal" onclick="closeModal()">&times;</span>
@@ -221,13 +243,13 @@
         body: JSON.stringify({ password: pass })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok) {
         adminPass = pass;
         localStorage.setItem("admin_password", pass);
         document.getElementById("loginScreen").style.display = "none";
         loadInitialData();
       } else {
-        alert(data.error);
+        alert(data.error || "Authentication Error!");
       }
     }
 
@@ -248,18 +270,21 @@
       document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("active"));
       document.getElementById(secId).classList.add("active");
       
-      const activeIdx = Array.from(document.getElementById("sidebar").children).findIndex(el => el.getAttribute('onclick').includes(secId));
-      if(activeIdx !== -1) document.getElementById("sidebar").children[activeIdx].classList.add("active");
+      const sidebarChildren = Array.from(document.getElementById("sidebar").children);
+      const activeIdx = sidebarChildren.findIndex(el => el.getAttribute('onclick') && el.getAttribute('onclick').includes(secId));
+      if(activeIdx !== -1) sidebarChildren[activeIdx].classList.add("active");
       
       toggleSidebar();
     }
 
-    async function makeRequest(url, method = "GET", body = null, isFormData = false) {
-      const headers = { "Authorization": adminPass };
-      if (!isFormData) headers["Content-Type"] = "application/json";
+    async function makeRequest(url, method = "GET", body = null) {
+      const headers = { 
+        "Authorization": adminPass,
+        "Content-Type": "application/json"
+      };
       
       const options = { method, headers };
-      if (body) options.body = isFormData ? body : JSON.stringify(body);
+      if (body) options.body = JSON.stringify(body);
 
       const res = await fetch(url, options);
       if (res.status === 401) {
@@ -271,31 +296,78 @@
       return res.json();
     }
 
+    // --- DIRECT SUPABASE IMAGE UPLOAD & POST SAVE ---
     async function submitPost(e) {
       e.preventDefault();
-      const formData = new FormData();
-      formData.append("image", document.getElementById("postImage").files[0]);
-      formData.append("name", document.getElementById("postName").value.trim());
-      formData.append("release_date", document.getElementById("postRelease").value.trim());
-      formData.append("genres", document.getElementById("postGenre").value.trim());
-      formData.append("season", document.getElementById("postSeason").value.trim());
-      formData.append("short_story", document.getElementById("postStory").value.trim());
-      formData.append("category", document.getElementById("postCategory").value.trim());
+      const saveBtn = document.getElementById("savePostBtn");
+      saveBtn.disabled = true;
+      saveBtn.innerText = "Requesting Upload Authorization...";
 
-      const res = await makeRequest("/api/admin/add-post", "POST", formData, true);
-      if (res.success) {
-        alert("Post successfully save ho gayi!");
-        document.getElementById("addPostForm").reset();
-        loadInitialData();
-      } else {
-        alert("Error: " + res.error);
+      try {
+        // Step 1: Request Supabase Direct upload credentials securely
+        const config = await makeRequest("/api/admin/config", "GET");
+        if (!config.supabaseUrl || !config.supabaseKey) {
+          throw new Error("Unable to fetch secure storage credentials!");
+        }
+
+        // Step 2: Initialize Supabase client locally on client browser
+        const localSupabase = supabase.createClient(config.supabaseUrl, config.supabaseKey);
+        
+        // Step 3: Upload files directly to storage
+        const imageFile = document.getElementById("postImage").files[0];
+        const fileExt = imageFile.name.split('.').pop();
+        const secureFileName = `${Math.random().toString(36).substring(2, 15)}-${Date.now()}.${fileExt}`;
+        
+        saveBtn.innerText = "Uploading Image directly to Storage (0% Netlify load)...";
+
+        const { data: uploadData, error: uploadError } = await localSupabase.storage
+          .from("Post-images")
+          .upload(secureFileName, imageFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Step 4: Fetch target public links URL
+        const { data: urlData } = localSupabase.storage.from("Post-images").getPublicUrl(secureFileName);
+        const publicImageUrl = urlData.publicUrl;
+
+        saveBtn.innerText = "Saving Anime Post Details...";
+
+        // Step 5: Save post metadata to API
+        const payload = {
+          name: document.getElementById("postName").value.trim(),
+          image_url: publicImageUrl,
+          release_date: document.getElementById("postRelease").value.trim(),
+          genres: document.getElementById("postGenre").value.trim(),
+          season: document.getElementById("postSeason").value.trim(),
+          short_story: document.getElementById("postStory").value.trim(),
+          category: document.getElementById("postCategory").value.trim()
+        };
+
+        const finalRes = await makeRequest("/api/admin/add-post", "POST", payload);
+        if (finalRes && finalRes.success) {
+          alert("Anime Post successfully saved!");
+          document.getElementById("addPostForm").reset();
+          loadInitialData();
+        } else {
+          throw new Error(finalRes.error || "Metadata database entry failed!");
+        }
+      } catch (err) {
+        alert("Upload Error: " + err.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerText = "Save Anime Post";
       }
     }
 
+    // --- 02. SELECT POST (ADD EPISODE WITH QUALITY SELECTOR) ---
     async function fetchPostsForSelection() {
       const search = document.getElementById("searchPostInput").value;
       const data = await makeRequest(`/api/admin/posts?search=${encodeURIComponent(search)}`);
       const container = document.getElementById("selectionList");
+      if(!data) return;
       container.innerHTML = data.map(post => `
         <div class="list-item" onclick="openEpisodeModal('${post.id}', '${post.name}')">
           <span>${post.name}</span>
@@ -306,24 +378,24 @@
 
     function openEpisodeModal(postId, postName) {
       document.getElementById("modalContent").innerHTML = `
-        <h3 style="margin-bottom: 20px;">Manage Episodes for "${postName}"</h3>
+        <h3 style="margin-bottom: 20px; color:#fff;">Add Episode for "${postName}"</h3>
         <form onsubmit="submitEpisode(event, '${postId}')">
           <div class="form-group">
-            <label>Episode/OVA Number</label>
-            <input type="text" id="epLabel" class="form-control" placeholder="example: 01 ya OVA 01" required>
+            <label>Episode Number</label>
+            <input type="text" id="epLabel" class="form-control" placeholder="example: 01 or Special OVA" required>
           </div>
           <div class="form-group">
             <label>Quality Format</label>
-            <select id="epQuality" class="form-control">
+            <select id="epQuality" class="form-control" style="background:#181822; color:white;">
+              <option value="">None / Default</option>
               <option value="FHD">FHD (1080p)</option>
               <option value="HD">HD (720p)</option>
               <option value="SD">SD (480p)</option>
-              <option value="">No Quality Label</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Download Original Link</label>
-            <input type="url" id="epLink" class="form-control" placeholder="https://..." required>
+            <label>Original Download Link</label>
+            <input type="url" id="epLink" class="form-control" placeholder="https://drive.google.com/..." required>
           </div>
           <button type="submit" class="btn-submit">Save Episode</button>
         </form>
@@ -334,28 +406,36 @@
     async function submitEpisode(e, postId) {
       e.preventDefault();
       const labelValue = document.getElementById("epLabel").value.trim();
-      const quality = document.getElementById("epQuality").value;
+      const qualityValue = document.getElementById("epQuality").value;
       
-      let epLabel = isNaN(labelValue) ? labelValue : "EPISODE " + String(labelValue).padStart(2, '0');
-      if (quality) {
-        epLabel += ` [${quality}]`;
+      let baseLabel = isNaN(labelValue) ? labelValue : "EPISODE " + String(labelValue).padStart(2, '0');
+      
+      // Dynamic brackets mapping logic
+      if (qualityValue) {
+        baseLabel = `${baseLabel} [${qualityValue}]`;
       }
       
       const original_link = document.getElementById("epLink").value.trim();
 
-      const res = await makeRequest("/api/admin/add-episode", "POST", { post_id: postId, episode_label: epLabel, original_link });
-      if (res.success) {
-        alert("Episode successfully add ho gaya!");
+      const res = await makeRequest("/api/admin/add-episode", "POST", { 
+        post_id: postId, 
+        episode_label: baseLabel, 
+        original_link 
+      });
+      if (res && res.success) {
+        alert("Episode Added with quality tag!");
         closeModal();
       } else {
-        alert("Error: " + res.error);
+        alert("Error adding episode: " + (res ? res.error : "Unknown error"));
       }
     }
 
+    // --- 03. DELETE POST & EPISODES ---
     async function fetchPostsForDeletion() {
       const search = document.getElementById("searchDeleteInput").value;
       const data = await makeRequest(`/api/admin/posts?search=${encodeURIComponent(search)}`);
       const container = document.getElementById("deletionList");
+      if(!data) return;
       container.innerHTML = data.map(post => `
         <div class="list-item" onclick="openDeleteModal('${post.id}', '${post.name}')">
           <span>${post.name}</span>
@@ -366,17 +446,17 @@
 
     async function openDeleteModal(postId, postName) {
       document.getElementById("modalContent").innerHTML = `
-        <h3 style="margin-bottom: 10px;">Delete: ${postName}</h3>
-        <button class="delete-btn" style="width: 100%; padding: 10px; margin-bottom: 20px;" onclick="deleteFullPost('${postId}')">DELETE FULL POST</button>
-        <h4>Delete Episodes Separately:</h4>
-        <div class="scroll-list" id="epListToDelete" style="margin-top:10px; max-height:200px;">Loading...</div>
+        <h3 style="margin-bottom: 10px; color:#fff;">Delete Manager: ${postName}</h3>
+        <button class="delete-btn" style="width: 100%; padding: 12px; margin-bottom: 25px; font-size:14px;" onclick="deleteFullPost('${postId}')">DELETE FULL POST (Wipes All Episodes)</button>
+        <h4 style="margin-bottom:10px; color:#aaa; font-size:14px; text-transform:uppercase;">Manage Individual Episodes:</h4>
+        <div class="scroll-list" id="epListToDelete" style="max-height:220px;">Loading episodes...</div>
       `;
       document.getElementById("modal").style.display = "flex";
 
       const episodes = await makeRequest(`/api/admin/episodes/${postId}`);
       const container = document.getElementById("epListToDelete");
-      if (episodes.length === 0) {
-        container.innerHTML = "<div style='padding:15px; color:#777;'>Koi episodes add nahi hain.</div>";
+      if (!episodes || episodes.length === 0) {
+        container.innerHTML = "<div style='padding:20px; color:#777; text-align:center;'>No episodes configured.</div>";
       } else {
         container.innerHTML = episodes.map(ep => `
           <div class="list-item" style="padding:10px 15px;">
@@ -388,10 +468,10 @@
     }
 
     async function deleteFullPost(postId) {
-      if (confirm("Kya aap sach mein poori Post delete karna chahte hain?")) {
+      if (confirm("Kya aap such mein is entry ko database se permanently delete karna chahte hain?")) {
         const res = await makeRequest("/api/admin/delete-post", "POST", { post_id: postId });
-        if (res.success) {
-          alert("Post delete ho gayi.");
+        if (res && res.success) {
+          alert("Anime post successfully deleted.");
           closeModal();
           fetchPostsForDeletion();
           fetchPostsForSelection();
@@ -402,24 +482,26 @@
     async function deleteSingleEpisode(epId, postId, postName) {
       if (confirm("Kya aap is episode ko delete karna chahte hain?")) {
         const res = await makeRequest("/api/admin/delete-episode", "POST", { episode_id: epId });
-        if (res.success) {
-          alert("Episode delete ho gaya.");
+        if (res && res.success) {
+          alert("Episode successfully deleted.");
           openDeleteModal(postId, postName);
         }
       }
     }
 
+    // --- 04. SHORTENERS SYSTEM ---
     async function fetchShorteners() {
       const data = await makeRequest("/api/admin/shorteners");
       const container = document.getElementById("shortenerList");
+      if(!data) return;
       if(data.length === 0) {
-        container.innerHTML = "<div style='padding:15px; color:#777; text-align:center;'>Koi shortener configured nahi hai.</div>";
+        container.innerHTML = "<div style='padding:25px; color:#777; text-align:center; font-weight:600;'>Direct download mode is active (No Shortener configured)</div>";
       } else {
         container.innerHTML = data.map((sh, idx) => `
           <div class="list-item">
             <div>
-              <strong>Shortener 0${idx+1}</strong><br>
-              <small>${sh.dashboard_url}</small>
+              <strong style="color:var(--primary);">Shortener Slot 0${idx+1}</strong><br>
+              <small style="color:#aaa;">${sh.dashboard_url}</small>
             </div>
             <button class="delete-btn" onclick="deleteShortener('${sh.id}')">Delete</button>
           </div>
@@ -434,29 +516,32 @@
         api_key: document.getElementById("apiKey").value.trim()
       };
       const res = await makeRequest("/api/admin/add-shortener", "POST", body);
-      if (res.success) {
-        alert("Shortener added!");
+      if (res && res.success) {
+        alert("Shortener successfully configured!");
         document.getElementById("shortenerForm").reset();
         fetchShorteners();
       } else {
-        alert("Error: " + res.error);
+        alert("Error: " + (res ? res.error : "Failed configuration"));
       }
     }
 
     async function deleteShortener(id) {
-      if (confirm("Kya aap is shortener ko delete karna chahte hain?")) {
+      if (confirm("Kya aap is shortener configuration ko delete karna chahte hain?")) {
         const res = await makeRequest("/api/admin/delete-shortener", "POST", { id });
-        if (res.success) {
-          alert("Shortener deleted.");
+        if (res && res.success) {
+          alert("Shortener configured successfully removed.");
           fetchShorteners();
         }
       }
     }
 
+    // --- 05. SETTINGS ---
     async function fetchSettings() {
       const data = await makeRequest("/api/admin/settings");
-      document.getElementById("chanLink").value = data.channel_link || "";
-      document.getElementById("groupLink").value = data.group_link || "";
+      if(data) {
+        document.getElementById("chanLink").value = data.channel_link || "";
+        document.getElementById("groupLink").value = data.group_link || "";
+      }
     }
 
     async function submitSettings(e) {
@@ -466,13 +551,14 @@
         group_link: document.getElementById("groupLink").value.trim()
       };
       const res = await makeRequest("/api/admin/save-settings", "POST", body);
-      if (res.success) {
-        alert("Links updated!");
+      if (res && res.success) {
+        alert("Telegram redirection channels saved!");
       } else {
-        alert("Error: " + res.error);
+        alert("Error saving: " + (res ? res.error : "Failed"));
       }
     }
 
+    // --- 06. PREMIUM CONTROLLER ---
     async function submitPremium(e) {
       e.preventDefault();
       const body = {
@@ -480,11 +566,11 @@
         password: document.getElementById("premPass").value.trim()
       };
       const res = await makeRequest("/api/admin/add-premium", "POST", body);
-      if (res.success) {
-        alert(`Premium account set kiya gaya!`);
+      if (res && res.success) {
+        alert(`Premium User Active!\nValid for: 28 Days\nExpires on: ${new Date(res.expires_at).toLocaleDateString()}`);
         document.getElementById("premiumForm").reset();
       } else {
-        alert("Error: " + res.error);
+        alert("Failed to assign user: " + (res ? res.error : "Failed"));
       }
     }
 
