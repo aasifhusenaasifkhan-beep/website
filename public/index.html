@@ -10,6 +10,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
     body { background: var(--bg); color: var(--text); overflow-x: hidden; }
     
+    /* Header design */
     .header { background: var(--header); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); }
     .header .logo { font-size: 22px; font-weight: bold; color: var(--primary); cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
     .search-bar { flex: 1; margin: 0 20px; max-width: 500px; position: relative; }
@@ -17,6 +18,7 @@
     .search-bar i { position: absolute; right: 15px; top: 12px; color: #aaa; }
     .menu-btn { font-size: 24px; cursor: pointer; color: var(--primary); }
 
+    /* Sliding Navigation Menu */
     .sidebar { position: fixed; right: -280px; top: 0; width: 280px; height: 100%; background: var(--header); padding: 30px 20px; transition: right 0.3s ease-in-out; z-index: 1000; overflow-y: auto; border-left: 1px solid var(--border); }
     .sidebar.open { right: 0; }
     .sidebar h3 { font-size: 20px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
@@ -25,6 +27,7 @@
     .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; display: none; }
     .overlay.show { display: block; }
 
+    /* Home Posts Grid */
     .section-title { padding: 20px 20px 0 20px; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); }
     .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; padding: 20px; }
     .post-card { background: #1a1a1a; border-radius: 8px; overflow: hidden; position: relative; cursor: pointer; border: 1px solid var(--border); transition: transform 0.2s; }
@@ -33,6 +36,7 @@
     .post-card .category-tag { position: absolute; top: 8px; right: 8px; background: var(--primary); color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
     .post-card .name { padding: 10px; font-size: 14px; text-align: center; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    /* Detail Page */
     .detail-page { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
     .detail-page.active { display: block; }
     .back-btn { background: none; color: var(--primary); border: none; font-size: 18px; cursor: pointer; margin-bottom: 20px; font-weight: bold; }
@@ -43,12 +47,14 @@
     .detail-info p { margin-bottom: 10px; font-size: 15px; line-height: 1.5; color: #ccc; }
     .detail-info p strong { color: white; }
     
+    /* Episodes section UI */
     .episodes { margin-top: 30px; background: #151515; padding: 20px; border-radius: 8px; border: 1px solid var(--border); }
     .episodes h3 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; font-size: 18px; }
     .episodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
     .episodes button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
     .episodes button:hover { background: #b8070e; }
 
+    /* Modal System */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
     .modal.active { display: flex; }
     .modal-box { background: #1a1a1a; border: 1px solid var(--border); padding: 30px; border-radius: 8px; text-align: center; width: 100%; max-width: 400px; position: relative; }
@@ -62,6 +68,7 @@
 </head>
 <body>
 
+  <!-- Top Header Bar -->
   <div class="header">
     <span class="logo" onclick="showHome()">AnimeSubStudio</span>
     <div class="search-bar">
@@ -82,16 +89,19 @@
     <a href="#" id="tgGroup" target="_blank">Group Link</a>
   </div>
 
+  <!-- Content Sections -->
   <div id="mainContent">
     <h2 class="section-title" id="gridTitle">All Posts</h2>
     <div id="postsGrid" class="posts-grid"></div>
     
+    <!-- Detail view -->
     <div id="detailPage" class="detail-page">
       <button class="back-btn" onclick="showHome()"><i class="fa-solid fa-arrow-left"></i> Back</button>
       <div id="detailContent"></div>
     </div>
   </div>
 
+  <!-- Modals -->
   <div class="modal" id="modal">
     <div class="modal-box" id="modalContent"></div>
   </div>
@@ -105,7 +115,7 @@
     let settings = {};
 
     async function loadApp() {
-      // Direct post fetch from Supabase (Guarantees data loading even if Netlify builds fail!)
+      // Direct post fetch from Supabase
       const { data, error } = await supabaseClient.from("posts").select("*").order("created_at", { ascending: false });
       if (data) {
         allPosts = data;
@@ -142,7 +152,6 @@
       document.getElementById("gridTitle").style.display = "none";
       document.getElementById("detailPage").classList.add("active");
       
-      // Public Episodes safe endpoint (NO original_link exposed to stop bypasses)
       const epRes = await fetch(`/api/episodes/${postId}`);
       const episodes = await epRes.json();
       const normalizedGenres = parseGenres(post.genres).join(", ");
