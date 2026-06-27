@@ -31,29 +31,42 @@ const adminAuth = (req, res, next) => {
 
 // Clean Dashboard URL & API Key (Auto-Sanitizer)
 function sanitizeShortener(dashUrl, apiKey) {
-  // 1. Trim leading and trailing spaces
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
-
-  // 2. Remove protocols (http://, https://, http//, https//, etc.)
   cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/\/|https?:|http?:)/i, "");
-
-  // 3. Remove leading and trailing slashes
   cleanUrl = cleanUrl.replace(/^\/+|\/+$/g, "");
-
-  // 4. Remove all internal spaces (e.g. "dashboard /api" becomes "dashboard/api")
   cleanUrl = cleanUrl.replace(/\s+/g, "");
   cleanKey = cleanKey.replace(/\s+/g, "");
-
   return { cleanUrl, cleanKey };
 }
 
-// Unified Router
 const router = express.Router();
 
 router.get("/health", (req, res) => {
   res.json({ status: "running", database_connected: !!supabase });
 });
+
+// ==================== PUBLIC FRONTEND ENDPOINTS (100% BYPASS SHIELD) ====================
+
+router.get("/episodes/:postId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not connected" });
+  const { data, error } = await supabase
+    .from("episodes")
+    .select("id, post_id, episode_label") // Excluded original_link to block bypass
+    .eq("post_id", req.params.postId)
+    .order("created_at", { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.get("/settings", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not connected" });
+  const { data, error } = await supabase.from("settings").select("channel_link, group_link").eq("id", 1).single();
+  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
+  res.json(data || { channel_link: "", group_link: "" });
+});
+
+// ==================== SECURE ADMIN OPERATIONS (With adminAuth) ====================
 
 router.post("/admin/login", (req, res) => {
   const { password } = req.body;
@@ -93,14 +106,13 @@ router.post("/admin/add-post", adminAuth, upload.single("image"), async (req, re
     }).select();
 
     if (dbError) throw dbError;
-
     res.json({ success: true, post: postData[0] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get("/admin/posts", async (req, res) => {
+router.get("/admin/posts", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { search } = req.query;
   let query = supabase.from("posts").select("*").order("created_at", { ascending: false });
@@ -135,7 +147,7 @@ router.post("/admin/delete-post", adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/admin/episodes/:postId", async (req, res) => {
+router.get("/admin/episodes/:postId", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase.from("episodes").select("*").eq("post_id", req.params.postId).order("created_at", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
@@ -150,7 +162,7 @@ router.post("/admin/delete-episode", adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/admin/shorteners", async (req, res) => {
+router.get("/admin/shorteners", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase.from("shorteners").select("*");
   if (error) return res.status(500).json({ error: error.message });
@@ -164,7 +176,8 @@ router.post("/admin/add-shortener", adminAuth, async (req, res) => {
   if (count >= 3) {
     return res.status(400).json({ error: "Sirf 3 shorteners tak allowed hain!" });
   }
-  const { data, error } = await supabase.from("shorteners").insert({ dashboard_url, api_key }).select();
+  const { cleanUrl, cleanKey } = sanitizeShortener(dashboard_url, api_key);
+  const { data, error } = await supabase.from("shorteners").insert({ dashboard_url: cleanUrl, api_key: cleanKey }).select();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, data });
 });
@@ -175,13 +188,6 @@ router.post("/admin/delete-shortener", adminAuth, async (req, res) => {
   const { error } = await supabase.from("shorteners").delete().eq("id", id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
-});
-
-router.get("/admin/settings", async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { data, error } = await supabase.from("settings").select("*").eq("id", 1).single();
-  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
-  res.json(data || { channel_link: "", group_link: "" });
 });
 
 router.post("/admin/save-settings", adminAuth, async (req, res) => {
@@ -196,15 +202,13 @@ router.post("/admin/add-premium", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { username, password } = req.body;
   const expires_at = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
-  const { error } = await supabase.from("premium_users").upsert(
-    { username, password, expires_at },
-    { onConflict: "username" }
-  );
+  const { error } = await supabase.from("premium_users").upsert({ username, password, expires_at }, { onConflict: "username" });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, expires_at });
 });
 
-// --- GENERATE SHORTLINK (WITH AUTO-SANITIZER) ---
+// ==================== SHORTLINK SECURE ENGINE ====================
+
 router.get("/shorten", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { post_name, ep_label } = req.query;
@@ -227,13 +231,8 @@ router.get("/shorten", async (req, res) => {
     const randomIndex = Math.floor(Math.random() * shorteners.length);
     const rawShortener = shorteners[randomIndex];
 
-    // Auto-Sanitize on the fly
     const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
-
-    // Build perfect API URL
     const apiUrl = `https://${cleanUrl}/api/${cleanKey}?url=${encodeURIComponent(originalLink)}`;
-    
-    console.log(`[API CALL] Calling shortener: ${apiUrl}`);
 
     const response = await fetch(apiUrl);
     const text = await response.text();
@@ -281,7 +280,6 @@ router.post("/premium-login", async (req, res) => {
   }
 });
 
-// Bind routers
 app.use("/api", router);
 app.use("/.netlify/functions/api", router);
 app.use("/", router);
