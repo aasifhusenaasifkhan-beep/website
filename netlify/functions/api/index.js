@@ -61,8 +61,8 @@ router.get("/admin/config", adminAuth, (req, res) => {
   });
 });
 
-// Save Post Metadata
-router.post("/api/admin/add-post", adminAuth, async (req, res) => {
+// Save Post Metadata (Corrected prefix mismatch)
+router.post("/admin/add-post", adminAuth, async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ error: "Database not connected" });
     const { name, image_url, release_date, genres, season, short_story, category } = req.body;
