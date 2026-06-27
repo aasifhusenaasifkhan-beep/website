@@ -40,33 +40,12 @@ function sanitizeShortener(dashUrl, apiKey) {
   return { cleanUrl, cleanKey };
 }
 
+// Unified Router
 const router = express.Router();
 
 router.get("/health", (req, res) => {
   res.json({ status: "running", database_connected: !!supabase });
 });
-
-// ==================== PUBLIC FRONTEND ENDPOINTS (100% BYPASS SHIELD) ====================
-
-router.get("/episodes/:postId", async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { data, error } = await supabase
-    .from("episodes")
-    .select("id, post_id, episode_label") // Excluded original_link to block bypass
-    .eq("post_id", req.params.postId)
-    .order("created_at", { ascending: true });
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-router.get("/settings", async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { data, error } = await supabase.from("settings").select("channel_link, group_link").eq("id", 1).single();
-  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
-  res.json(data || { channel_link: "", group_link: "" });
-});
-
-// ==================== SECURE ADMIN OPERATIONS (With adminAuth) ====================
 
 router.post("/admin/login", (req, res) => {
   const { password } = req.body;
@@ -74,6 +53,18 @@ router.post("/admin/login", (req, res) => {
     return res.json({ success: true });
   }
   return res.status(401).json({ error: "Galat Password!" });
+});
+
+// Frontend Public Episodes secure route (original_link is hidden to stop bypasses)
+router.get("/episodes/:postId", async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not connected" });
+  const { data, error } = await supabase
+    .from("episodes")
+    .select("id, post_id, episode_label") // No original_link to stop inspect bypass
+    .eq("post_id", req.params.postId)
+    .order("created_at", { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
 router.post("/admin/add-post", adminAuth, upload.single("image"), async (req, res) => {
@@ -190,6 +181,13 @@ router.post("/admin/delete-shortener", adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+router.get("/admin/settings", adminAuth, async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: "Database not connected" });
+  const { data, error } = await supabase.from("settings").select("*").eq("id", 1).single();
+  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
+  res.json(data || { channel_link: "", group_link: "" });
+});
+
 router.post("/admin/save-settings", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { channel_link, group_link } = req.body;
@@ -202,13 +200,15 @@ router.post("/admin/add-premium", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { username, password } = req.body;
   const expires_at = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
-  const { error } = await supabase.from("premium_users").upsert({ username, password, expires_at }, { onConflict: "username" });
+  const { error } = await supabase.from("premium_users").upsert(
+    { username, password, expires_at },
+    { onConflict: "username" }
+  );
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, expires_at });
 });
 
-// ==================== SHORTLINK SECURE ENGINE ====================
-
+// --- GENERATE SHORTLINK (WITH AUTO-SANITIZER) ---
 router.get("/shorten", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { post_name, ep_label } = req.query;
@@ -233,6 +233,8 @@ router.get("/shorten", async (req, res) => {
 
     const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
     const apiUrl = `https://${cleanUrl}/api/${cleanKey}?url=${encodeURIComponent(originalLink)}`;
+    
+    console.log(`[API CALL] Calling shortener: ${apiUrl}`);
 
     const response = await fetch(apiUrl);
     const text = await response.text();
@@ -271,7 +273,7 @@ router.post("/premium-login", async (req, res) => {
     const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
     if (!post) return res.status(404).json({ error: "Post nahi mili" });
 
-    const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+    const { data: ep = null } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
     if (!ep) return res.status(404).json({ error: "Episode nahi mila" });
 
     res.json({ success: true, original_link: ep.original_link });
@@ -284,5 +286,6 @@ app.use("/api", router);
 app.use("/.netlify/functions/api", router);
 app.use("/", router);
 
-module.exports = app;
-module.exports.handler = serverless(app);
+// EXPORT HANDLER TO FIX THE LAMBDA CRASH
+const handler = serverless(app);
+module.exports = { handler };
