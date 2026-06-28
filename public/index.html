@@ -61,7 +61,6 @@
     .close-modal { position: absolute; top: 15px; right: 15px; font-size: 22px; cursor: pointer; color: #777; transition: 0.2s; }
     .close-modal:hover { color: white; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -100,26 +99,33 @@
   </div>
 
   <script>
-    const SUPABASE_URL = "https://kvdfdflygyssnldvahzv.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_7MW440PYXtbHbJpAq1v-OQ__1KZvK4R";
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
     let allPosts = [];
     let settings = {};
 
     async function loadApp() {
-      // Direct fast load from Supabase to prevent redeploy blanks!
-      const { data, error } = await supabaseClient.from("posts").select("*").order("created_at", { ascending: false });
-      if (data) {
-        allPosts = data;
-        renderPosts(allPosts);
+      try {
+        // RLS safety issue solved by fetching via secure Netlify API backend instead of direct Supabase client
+        const res = await fetch("/api/posts");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          allPosts = data;
+          renderPosts(allPosts);
+        } else {
+          console.error("Failed to load posts:", data);
+        }
+      } catch (err) {
+        console.error("Error loading posts:", err);
       }
 
-      // Load Settings Links from Express
-      const setRes = await fetch("/api/settings");
-      settings = await setRes.json();
-      document.getElementById("tgChannel").href = settings.channel_link || "#";
-      document.getElementById("tgGroup").href = settings.group_link || "#";
+      // Load Settings Links from Express API
+      try {
+        const setRes = await fetch("/api/settings");
+        settings = await setRes.json();
+        document.getElementById("tgChannel").href = settings.channel_link || "#";
+        document.getElementById("tgGroup").href = settings.group_link || "#";
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      }
     }
 
     function renderPosts(posts) {
