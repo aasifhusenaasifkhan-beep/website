@@ -29,7 +29,7 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// Advanced Domain extractor: Converts 'https://app.bitly.com/Bq6sfFja0Zz/home' to 'app.bitly.com'
+// URL Sanitizer: Extracts ONLY host domain (e.g. converts 'https://shrtfly.com/publisher' to 'shrtfly.com')
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
@@ -39,7 +39,7 @@ function sanitizeShortener(dashUrl, apiKey) {
       cleanUrl = "https://" + cleanUrl;
     }
     const parsed = new URL(cleanUrl);
-    cleanUrl = parsed.hostname;
+    cleanUrl = parsed.hostname; // outputs 'shrtfly.com' or 'gplinks.com' or 'app.bitly.com'
   } catch (e) {
     cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
     cleanUrl = cleanUrl.split('/')[0];
@@ -60,10 +60,10 @@ async function cleanExpiredPremiumUsers() {
   }
 }
 
-// Highly robust fetch function with native Bitly and AdlinkFly support
+// Universal Shortener Fetcher: Supports Bitly (v4 POST) & standard shorteners (GET)
 async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
   
-  // 1. NATIVE BITLY (v4) SUPPORT
+  // 1. NATIVE BITLY (v4 API) SUPPORT
   if (cleanUrl.includes("bitly")) {
     try {
       const response = await fetch("https://api-ssl.bitly.com/v4/shorten", {
@@ -77,54 +77,49 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
       if (response.ok) {
         const data = await response.json();
         if (data && data.link) {
-          return data.link; // Returns 'https://bit.ly/xxxx'
+          return data.link;
         }
       } else {
         const errText = await response.text();
-        console.error("Bitly API responded with error:", response.status, errText);
+        console.error("Bitly API Error:", response.status, errText);
       }
     } catch (err) {
-      console.error("Bitly shortening exception:", err.message);
+      console.error("Bitly shortening failed:", err.message);
     }
     return null;
   }
 
-  // 2. STANDARD ADLINKFLY SUPPORT (GPLinks, ShrinkMe, etc.)
-  const tryUrls = [];
-  if (!cleanUrl.startsWith("api.")) {
-    tryUrls.push(`https://api.${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
-  }
-  tryUrls.push(`https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
+  // 2. UNIVERSAL SUPPORT FOR ALL OTHER SHORTENERS (GPLinks, ShrtFly, ShrinkMe, Clk.sh, etc.)
+  // Calls the domain directly as configured to avoid timeout issues
+  const apiUrl = `https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`;
 
-  for (const url of tryUrls) {
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "application/json, text/plain, */*"
-        },
-        timeout: 6000
-      });
-      
-      if (response.ok) {
-        const text = await response.text();
-        let shortLink = "";
-        try {
-          const json = JSON.parse(text);
-          shortLink = json.shortenedUrl || json.short_url || json.url || "";
-        } catch (e) {
-          if (text.startsWith("http://") || text.startsWith("https://")) {
-            shortLink = text.trim();
-          }
-        }
-        if (shortLink && shortLink.startsWith("http")) {
-          return shortLink;
+  try {
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*"
+      },
+      timeout: 5000 // 5 Seconds fast timeout to prevent Netlify serverless crash
+    });
+    
+    if (response.ok) {
+      const text = await response.text();
+      let shortLink = "";
+      try {
+        const json = JSON.parse(text);
+        shortLink = json.shortenedUrl || json.short_url || json.url || "";
+      } catch (e) {
+        if (text.startsWith("http://") || text.startsWith("https://")) {
+          shortLink = text.trim();
         }
       }
-    } catch (err) {
-      console.error(`Shortener fetch failed for URL: ${url}`, err.message);
+      if (shortLink && shortLink.startsWith("http")) {
+        return shortLink;
+      }
     }
+  } catch (err) {
+    console.error(`Shortener fetch failed for domain: ${cleanUrl}`, err.message);
   }
   return null;
 }
@@ -338,10 +333,10 @@ router.get("/shorten", async (req, res) => {
 
     const { data: shorteners } = await supabase.from("shorteners").select("*");
     if (!shorteners || shorteners.length === 0) {
-      // If no shortener is added in DB, allow direct download
       return res.json({ shortLink: originalLink });
     }
 
+    // Picks a random configured shortener
     const randomIndex = Math.floor(Math.random() * shorteners.length);
     const rawShortener = shorteners[randomIndex];
     const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
@@ -351,8 +346,8 @@ router.get("/shorten", async (req, res) => {
     if (shortLink && shortLink.startsWith("http")) {
       res.json({ shortLink });
     } else {
-      // ANTI-BYPASS SECURITY: Never send original direct link on shortener API failure
-      res.json({ error: "Shortener API currently busy ya down hai! Kripya thodi der baad firse prayas karein." });
+      // SECURITY SHIELD: Return clear error on shortener API down/busy to prevent bypass loophole
+      res.json({ error: "Shortener API down ya busy hai! Kripya settings check karein ya thodi der baad dobara koshish karein." });
     }
   } catch (err) {
     res.json({ error: "Shortener process execution error: " + err.message });
