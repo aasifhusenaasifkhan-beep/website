@@ -29,25 +29,57 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// URL Sanitizer: Extracts ONLY host domain (e.g. converts 'https://shrtfly.com/publisher' to 'shrtfly.com')
+// Robust URL Sanitizer: Safely preserves host, subdomain, and custom paths (like /member/tools/api or /api/v1)
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
   
+  // Clean apiKey - remove any whitespace, but preserve special characters if any
+  cleanKey = cleanKey.replace(/\s+/g, "");
+
   try {
+    // Standardize protocol
     if (!/^https?:\/\//i.test(cleanUrl)) {
       cleanUrl = "https://" + cleanUrl;
     }
     const parsed = new URL(cleanUrl);
-    cleanUrl = parsed.hostname; // outputs 'shrtfly.com' or 'gplinks.com' or 'app.bitly.com'
+    let host = parsed.hostname;
+    let path = parsed.pathname;
+
+    // Clean up path: remove trailing slash, and remove redundant query/hash
+    if (path.endsWith("/")) {
+      path = path.slice(0, -1);
+    }
+
+    if (path === "" || path === "/") {
+      cleanUrl = host;
+    } else {
+      cleanUrl = host + path;
+    }
   } catch (e) {
+    // Fallback if URL parsing fails
     cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
-    cleanUrl = cleanUrl.split('/')[0];
+    cleanUrl = cleanUrl.split('?')[0].split('#')[0];
+    if (cleanUrl.endsWith("/")) {
+      cleanUrl = cleanUrl.slice(0, -1);
+    }
   }
-  
+
+  // Final trim and safety check
   cleanUrl = cleanUrl.replace(/\s+/g, "");
-  cleanKey = cleanKey.replace(/\s+/g, "");
   return { cleanUrl, cleanKey };
+}
+
+// Appends a unique cache-buster/click param to force fresh shortened link generation on each request
+function appendRandomParam(url) {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("_c", Math.random().toString(36).substring(2, 9) + Date.now().toString().slice(-5));
+    return parsed.toString();
+  } catch (e) {
+    const separator = url.includes("?") ? "&" : "?";
+    return url + separator + "_c=" + Math.random().toString(36).substring(2, 9) + Date.now().toString().slice(-5);
+  }
 }
 
 async function cleanExpiredPremiumUsers() {
@@ -91,7 +123,10 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
 
   // 2. UNIVERSAL SUPPORT FOR ALL OTHER SHORTENERS (GPLinks, ShrtFly, ShrinkMe, Clk.sh, etc.)
   // Calls the domain directly as configured to avoid timeout issues
-  const apiUrl = `https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`;
+  const hasPath = cleanUrl.includes("/");
+  const apiUrl = hasPath 
+    ? `https://${cleanUrl}?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`
+    : `https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`;
 
   try {
     const response = await fetch(apiUrl, {
@@ -108,10 +143,13 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
       let shortLink = "";
       try {
         const json = JSON.parse(text);
-        shortLink = json.shortenedUrl || json.short_url || json.url || "";
+        shortLink = json.shortenedUrl || json.shortened_url || json.short_url || json.url || json.link || (json.data && (json.data.short_url || json.data.shortenedUrl || json.data.url)) || "";
       } catch (e) {
-        if (text.startsWith("http://") || text.startsWith("https://")) {
-          shortLink = text.trim();
+        // Regex fallback to pull out any URL in case plain text formatting has wrappers
+        const urlRegex = /(https?:\/\/[^\s"'<>]+)/i;
+        const match = text.match(urlRegex);
+        if (match) {
+          shortLink = match[0].trim();
         }
       }
       if (shortLink && shortLink.startsWith("http")) {
@@ -316,38 +354,53 @@ router.post("/admin/delete-premium", adminAuth, async (req, res) => {
 
 router.get("/shorten", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { post_name, ep_label } = req.query;
-  if (!post_name || !ep_label) return res.status(400).json({ error: "Missing parameters" });
+  const { post_name, ep_label, ep_id } = req.query;
 
   try {
-    const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
-    if (!post) return res.status(404).json({ error: "Post not found" });
-
-    const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+    let ep = null;
+    // Fast ID-based lookup to bypass string encoding/mismatch bugs on old/special episodes
+    if (ep_id) {
+      const { data } = await supabase.from("episodes").select("original_link").eq("id", ep_id).single();
+      ep = data;
+    } else if (post_name && ep_label) {
+      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name.trim()).single();
+      if (post) {
+        const { data } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label.trim()).single();
+        ep = data;
+      }
+    }
     
     if (!ep || !ep.original_link) {
       return res.json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
     }
 
     const originalLink = ep.original_link;
+    // Add cache-busting to ensure that the shortener service registers view counts on every unique click
+    const uniqueOriginalLink = appendRandomParam(originalLink);
 
     const { data: shorteners } = await supabase.from("shorteners").select("*");
     if (!shorteners || shorteners.length === 0) {
-      return res.json({ shortLink: originalLink });
+      // SECURITY SHIELD: Return error if shorteners are missing to avoid giving raw unshortened links
+      return res.json({ error: "Koi active shortener account configured nahi mila! Kripya admin se kahin active shorteners add karein." });
     }
 
-    // Picks a random configured shortener
-    const randomIndex = Math.floor(Math.random() * shorteners.length);
-    const rawShortener = shorteners[randomIndex];
-    const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
+    // Shuffle shorteners to load-balance traffic, and sequentially try them on network failures
+    const shuffledShorteners = [...shorteners].sort(() => Math.random() - 0.5);
     
-    const shortLink = await fetchShortlink(cleanUrl, cleanKey, originalLink);
+    let shortLink = null;
+    
+    for (const rawShortener of shuffledShorteners) {
+      const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
+      shortLink = await fetchShortlink(cleanUrl, cleanKey, uniqueOriginalLink);
+      if (shortLink && shortLink.startsWith("http")) {
+        break; // Stop iterating as soon as we successfully get a shortened URL
+      }
+    }
     
     if (shortLink && shortLink.startsWith("http")) {
       res.json({ shortLink });
     } else {
-      // SECURITY SHIELD: Return clear error on shortener API down/busy to prevent bypass loophole
-      res.json({ error: "Shortener API down ya busy hai! Kripya settings check karein ya thodi der baad dobara koshish karein." });
+      res.json({ error: "Shortener APIs down ya busy hain! Kripya thodi der baad dobara koshish karein." });
     }
   } catch (err) {
     res.json({ error: "Shortener process execution error: " + err.message });
@@ -358,7 +411,7 @@ router.get("/shorten", async (req, res) => {
 
 router.post("/verify-player", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { password, post_name, ep_label } = req.body;
+  const { password, post_name, ep_label, ep_id } = req.body;
 
   try {
     const { data: settings } = await supabase.from("settings").select("player_password").eq("id", 1).single();
@@ -368,10 +421,17 @@ router.post("/verify-player", async (req, res) => {
       return res.status(401).json({ error: "Streaming password galat hai!" });
     }
 
-    const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
-    if (!post) return res.status(404).json({ error: "Post not found" });
-
-    const { data: ep } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+    let ep = null;
+    if (ep_id) {
+      const { data } = await supabase.from("episodes").select("play_link").eq("id", ep_id).single();
+      ep = data;
+    } else if (post_name && ep_label) {
+      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name.trim()).single();
+      if (post) {
+        const { data } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label.trim()).single();
+        ep = data;
+      }
+    }
     
     if (!ep || !ep.play_link) {
       return res.status(404).json({ error: "Is episode ke liye Stream Video Link uplabdh nahi hai!" });
@@ -430,14 +490,14 @@ router.get("/play-stream", (req, res) => {
         </div>
         
         <div class="player-wrapper">
-          ${isEmbed ? `
-            <iframe src="${originalUrl}" allowfullscreen="true" scrolling="no" allow="autoplay; encrypted-media"></iframe>
-          ` : `
+          \${isEmbed ? \`
+            <iframe src="\${originalUrl}" allowfullscreen="true" scrolling="no" allow="autoplay; encrypted-media"></iframe>
+          \` : \`
             <video controls autoplay>
-              <source src="${originalUrl}" type="video/mp4">
+              <source src="\${originalUrl}" type="video/mp4">
               Your browser does not support HTML5 playback.
             </video>
-          `}
+          \`}
         </div>
       </div>
 
@@ -488,7 +548,7 @@ router.post("/premium-login", async (req, res) => {
 
 router.post("/premium-bypass", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { username, session_token, post_name, ep_label } = req.body;
+  const { username, session_token, post_name, ep_label, ep_id } = req.body;
   if (!username || !session_token) return res.status(401).json({ error: "Aap logged in nahi hain!" });
 
   try {
@@ -508,10 +568,17 @@ router.post("/premium-bypass", async (req, res) => {
       return res.status(403).json({ error: "Device Limit Reached! Is Gmail ID ko doosra device chala raha hai." });
     }
 
-    const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
-    if (!post) return res.status(404).json({ error: "Post not found" });
-
-    const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+    let ep = null;
+    if (ep_id) {
+      const { data } = await supabase.from("episodes").select("original_link").eq("id", ep_id).single();
+      ep = data;
+    } else if (post_name && ep_label) {
+      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name.trim()).single();
+      if (post) {
+        const { data } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label.trim()).single();
+        ep = data;
+      }
+    }
     
     if (!ep || !ep.original_link) {
       return res.status(404).json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
