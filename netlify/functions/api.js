@@ -29,11 +29,11 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// Clean Dashboard URL & API Key (Auto-Sanitizer)
+// Clean Dashboard URL & API Key (Auto-Sanitizer) function
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
-  cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/\/|https?:|http?:)/i, "");
+  cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
   cleanUrl = cleanUrl.replace(/^\/+|\/+$/g, "");
   cleanUrl = cleanUrl.replace(/\s+/g, "");
   cleanKey = cleanKey.replace(/\s+/g, "");
@@ -46,7 +46,7 @@ router.get("/health", (req, res) => {
   res.json({ status: "running", database_connected: !!supabase });
 });
 
-// ==================== PUBLIC FRONTEND ENDPOINTS (RLS BYPASS & BYPASS SHIELD) ====================
+// ==================== PUBLIC FRONTEND ENDPOINTS (RLS BYPASS) ====================
 
 // 1. PUBLIC: Get all posts safely (Bypasses Supabase RLS using Secret Key)
 router.get("/posts", async (req, res) => {
@@ -91,28 +91,19 @@ router.post("/admin/login", (req, res) => {
   return res.status(401).json({ error: "Galat Password!" });
 });
 
-router.post("/admin/add-post", adminAuth, upload.single("image"), async (req, res) => {
+// Direct text details + browser-uploaded image_url save
+router.post("/admin/add-post", adminAuth, async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ error: "Database not connected" });
-    const { name, release_date, genres, season, short_story, category } = req.body;
-    if (!req.file) return res.status(400).json({ error: "Image upload karna zaroori hai" });
-
-    const fileName = `${uuidv4()}-${req.file.originalname}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("Post-images")
-      .upload(fileName, req.file.buffer, {
-        contentType: req.file.mimetype,
-        duplex: "half"
-      });
-
-    if (uploadError) throw uploadError;
-
-    const { data: urlData } = supabase.storage.from("Post-images").getPublicUrl(fileName);
-    const imageUrl = urlData.publicUrl;
+    const { name, image_url, release_date, genres, season, short_story, category } = req.body;
+    
+    if (!image_url) {
+      return res.status(400).json({ error: "Image URL (image_url) zaroori hai!" });
+    }
 
     const { data: postData, error: dbError } = await supabase.from("posts").insert({
       name,
-      image_url: imageUrl,
+      image_url,
       release_date,
       genres,
       season,
@@ -122,6 +113,7 @@ router.post("/admin/add-post", adminAuth, upload.single("image"), async (req, re
 
     if (dbError) throw dbError;
     res.json({ success: true, post: postData[0] });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -150,7 +142,7 @@ router.post("/admin/add-episode", adminAuth, async (req, res) => {
 router.post("/admin/delete-post", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { post_id } = req.body;
-  
+
   const { data: post } = await supabase.from("posts").select("image_url").eq("id", post_id).single();
   if (post && post.image_url) {
     const fileName = post.image_url.split("/").pop();
@@ -259,6 +251,7 @@ router.get("/shorten", async (req, res) => {
     } catch (e) {}
 
     res.json({ shortLink });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -290,6 +283,7 @@ router.post("/premium-login", async (req, res) => {
     if (!ep) return res.status(404).json({ error: "Episode not found" });
 
     res.json({ success: true, original_link: ep.original_link });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -299,6 +293,6 @@ app.use("/api", router);
 app.use("/.netlify/functions/api", router);
 app.use("/", router);
 
-// SERVERLESS HANDLER EXPORT (100% CORRECT)
+// SERVERLESS HANDLER EXPORT
 const handler = serverless(app);
 module.exports = { handler };
