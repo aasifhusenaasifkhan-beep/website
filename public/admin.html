@@ -6,52 +6,57 @@
   <title>AnimeSubStudio Admin Panel</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    :root { --bg: #0f0f0f; --panel: #1a1a1a; --primary: #e50914; --text: #ffffff; --border: #333; }
+    :root { --bg: #0b0b0c; --panel: #121214; --primary: #e50914; --primary-hover: #b8070e; --text: #ffffff; --border: #222226; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background: var(--bg); color: var(--text); overflow-x: hidden; }
     
     #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 10000; }
-    .login-box { background: var(--panel); padding: 40px; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--border); }
-    .login-box h2 { color: var(--primary); margin-bottom: 20px; }
-    .login-box input { width: 100%; padding: 12px; margin-bottom: 20px; background: #2b2b2b; border: none; color: white; border-radius: 5px; font-size: 16px; text-align: center; }
-    .login-box button { background: var(--primary); color: white; width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+    .login-box { background: var(--panel); padding: 40px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--border); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .login-box h2 { color: var(--primary); margin-bottom: 25px; font-weight: 800; letter-spacing: 1px; }
+    .login-box input { width: 100%; padding: 14px; margin-bottom: 20px; background: #1c1c21; border: 1px solid var(--border); color: white; border-radius: 8px; font-size: 16px; text-align: center; transition: 0.3s; }
+    .login-box input:focus { border-color: var(--primary); outline: none; }
+    .login-box button { background: var(--primary); color: white; width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+    .login-box button:hover { background: var(--primary-hover); }
 
-    .header { background: var(--panel); padding: 15px 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+    .header { background: var(--panel); padding: 15px 25px; display: flex; align-items: center; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
     .menu-toggle { font-size: 24px; cursor: pointer; margin-right: 20px; color: var(--primary); }
-    .site-name { font-size: 20px; font-weight: bold; }
+    .site-name { font-size: 20px; font-weight: bold; letter-spacing: 0.5px; }
 
-    .sidebar { position: fixed; left: -280px; top: 0; height: 100%; width: 280px; background: var(--panel); z-index: 999; transition: 0.3s; padding-top: 80px; border-right: 1px solid var(--border); }
+    .sidebar { position: fixed; left: -280px; top: 0; height: 100%; width: 280px; background: var(--panel); z-index: 999; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding-top: 80px; border-right: 1px solid var(--border); }
     .sidebar.open { left: 0; }
-    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 998; }
+    .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 998; backdrop-filter: blur(4px); }
     .sidebar-overlay.show { display: block; }
-    .menu-item { display: flex; align-items: center; padding: 15px 25px; color: var(--text); text-decoration: none; cursor: pointer; font-size: 16px; transition: 0.2s; }
-    .menu-item i { margin-right: 15px; width: 20px; text-align: center; color: var(--primary); }
-    .menu-item:hover, .menu-item.active { background: #262626; }
+    .menu-item { display: flex; align-items: center; padding: 15px 25px; color: var(--text); text-decoration: none; cursor: pointer; font-size: 15px; font-weight: 500; transition: 0.2s; }
+    .menu-item i { margin-right: 15px; width: 20px; text-align: center; color: var(--primary); font-size: 17px; }
+    .menu-item:hover, .menu-item.active { background: rgba(229, 9, 20, 0.08); color: var(--primary); border-left: 4px solid var(--primary); }
 
     .main-content { max-width: 800px; margin: 40px auto; padding: 0 20px; }
-    .section-card { background: var(--panel); padding: 30px; border-radius: 8px; border: 1px solid var(--border); display: none; }
+    .section-card { background: var(--panel); padding: 35px; border-radius: 12px; border: 1px solid var(--border); display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
     .section-card.active { display: block; }
-    .section-card h3 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
+    .section-card h3 { border-bottom: 2px solid var(--primary); padding-bottom: 12px; margin-bottom: 25px; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
 
-    .form-group { margin-bottom: 20px; }
-    .form-group label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; }
-    .form-control { width: 100%; padding: 12px; background: #252525; border: 1px solid var(--border); border-radius: 5px; color: white; font-size: 15px; }
+    .form-group { margin-bottom: 22px; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #ccc; }
+    .form-control { width: 100%; padding: 12px 16px; background: #1a1a1f; border: 1px solid var(--border); border-radius: 8px; color: white; font-size: 15px; transition: 0.3s; }
+    .form-control:focus { border-color: var(--primary); outline: none; }
     textarea.form-control { height: 100px; resize: none; }
-    .btn-submit { background: var(--primary); color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+    .btn-submit { background: var(--primary); color: white; padding: 14px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: 0.2s; }
+    .btn-submit:hover { background: var(--primary-hover); }
     .btn-submit:disabled { background: #555; cursor: not-allowed; }
 
     .search-container { position: relative; margin-bottom: 20px; }
-    .search-container input { padding-left: 40px; }
-    .search-container i { position: absolute; left: 15px; top: 15px; color: #777; }
-    .scroll-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 5px; background: #151515; }
-    .list-item { padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-    .list-item:hover { background: #222; }
-    .delete-btn { background: #7c040a; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .search-container input { padding-left: 45px; }
+    .search-container i { position: absolute; left: 18px; top: 15px; color: #777; }
+    .scroll-list { max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #0f0f11; }
+    .list-item { padding: 15px 20px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .list-item:hover { background: rgba(255,255,255,0.02); }
+    .delete-btn { background: #7c040a; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; }
     .delete-btn:hover { background: var(--primary); }
 
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1001; justify-content: center; align-items: center; padding: 20px; }
-    .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 100%; max-width: 500px; padding: 30px; position: relative; }
-    .close-modal { position: absolute; top: 15px; right: 15px; font-size: 20px; cursor: pointer; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1001; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(5px); }
+    .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 500px; padding: 35px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .close-modal { position: absolute; top: 18px; right: 18px; font-size: 24px; cursor: pointer; color: #777; transition: 0.2s; }
+    .close-modal:hover { color: white; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -78,8 +83,8 @@
     <div class="menu-item" onclick="switchSection('selectPostSec')"><i class="fa-solid fa-magnifying-glass"></i> Select Post (02)</div>
     <div class="menu-item" onclick="switchSection('deletePostSec')"><i class="fa-solid fa-trash-can"></i> Delete Post & Episodes (03)</div>
     <div class="menu-item" onclick="switchSection('shortenersSec')"><i class="fa-solid fa-link"></i> Shortener System (04)</div>
-    <div class="menu-item" onclick="switchSection('linksSec')"><i class="fa-solid fa-circle-nodes"></i> Add Channel Link (05)</div>
-    <div class="menu-item" onclick="switchSection('premiumSec')"><i class="fa-solid fa-user-shield"></i> Premium Add (06)</div>
+    <div class="menu-item" onclick="switchSection('linksSec')"><i class="fa-solid fa-circle-nodes"></i> Site & Player Settings (05)</div>
+    <div class="menu-item" onclick="switchSection('premiumSec')"><i class="fa-solid fa-user-shield"></i> Premium Members (06)</div>
   </div>
 
   <div class="main-content">
@@ -159,33 +164,40 @@
       </form>
     </div>
 
-    <!-- 05. ADD CHANNEL & GROUP LINK -->
+    <!-- 05. SITE & PLAYER SETTINGS -->
     <div id="linksSec" class="section-card">
-      <h3>Channel & Group Settings</h3>
+      <h3>Site & Video Player Settings</h3>
       <form id="settingsForm" onsubmit="submitSettings(event)">
         <div class="form-group">
-          <label>Add Channel Link</label>
+          <label>Add Telegram Channel Link</label>
           <input type="url" id="chanLink" class="form-control" placeholder="https://t.me/channel_link" required>
         </div>
         <div class="form-group">
-          <label>Add Group Link</label>
+          <label>Add Telegram Group Link</label>
           <input type="url" id="groupLink" class="form-control" placeholder="https://t.me/group_link" required>
         </div>
-        <button type="submit" class="btn-submit">Save Links</button>
+        <div class="form-group">
+          <label>Video Player Password (Global)</label>
+          <input type="text" id="playerPass" class="form-control" placeholder="Set global streaming password" required>
+        </div>
+        <button type="submit" class="btn-submit">Save Settings</button>
       </form>
     </div>
 
-    <!-- 06. PREMIUM USER ADD -->
+    <!-- 06. PREMIUM USER MANAGEMENTS -->
     <div id="premiumSec" class="section-card">
-      <h3>Add Premium User (28 Days Expiry)</h3>
-      <form id="premiumForm" onsubmit="submitPremium(event)">
+      <h3>Premium Users (Gmail System)</h3>
+      <div class="scroll-list" id="premiumUsersList" style="margin-bottom: 25px;">Loading...</div>
+
+      <h4>Add Premium Gmail (28 Days Expiry)</h4>
+      <form id="premiumForm" onsubmit="submitPremium(event)" style="margin-top: 15px;">
         <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="premUser" class="form-control" placeholder="Unique username" required>
+          <label>Gmail / Email ID</label>
+          <input type="email" id="premUser" class="form-control" placeholder="user@gmail.com" required>
         </div>
         <div class="form-group">
-          <label>Password</label>
-          <input type="text" id="premPass" class="form-control" placeholder="Unique password" required>
+          <label>Premium Password</label>
+          <input type="text" id="premPass" class="form-control" placeholder="Pass key" required>
         </div>
         <button type="submit" class="btn-submit">Generate Premium User</button>
       </form>
@@ -207,7 +219,6 @@
 
     let adminPass = localStorage.getItem("admin_password") || "";
     
-    // UUID generator
     function generateUUID() {
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -243,6 +254,7 @@
       fetchPostsForDeletion();
       fetchShorteners();
       fetchSettings();
+      fetchPremiumUsers();
     }
 
     function toggleSidebar() {
@@ -255,8 +267,9 @@
       document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("active"));
       document.getElementById(secId).classList.add("active");
       
-      const activeIdx = Array.from(document.getElementById("sidebar").children).findIndex(el => el.getAttribute('onclick').includes(secId));
-      if(activeIdx !== -1) document.getElementById("sidebar").children[activeIdx].classList.add("active");
+      const sidebarChildren = Array.from(document.getElementById("sidebar").children);
+      const activeIdx = sidebarChildren.findIndex(el => el.getAttribute('onclick') && el.getAttribute('onclick').includes(secId));
+      if(activeIdx !== -1) sidebarChildren[activeIdx].classList.add("active");
       
       toggleSidebar();
     }
@@ -278,7 +291,6 @@
       return res.json();
     }
 
-    // Direct Browser-to-Supabase Secure Storage Upload (Solves Netlify Serverless Multer crash!)
     async function submitPost(e) {
       e.preventDefault();
       
@@ -297,7 +309,6 @@
       try {
         const fileName = `${generateUUID()}-${file.name.replace(/\s+/g, "_")}`;
         
-        // Direct browser upload
         const { data: uploadData, error: uploadError } = await supabaseClient.storage
           .from("Post-images")
           .upload(fileName, file);
@@ -306,7 +317,6 @@
 
         const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/Post-images/${fileName}`;
 
-        // Send text details to Netlify function securely
         const body = {
           image_url: imageUrl,
           name: document.getElementById("postName").value.trim(),
@@ -319,7 +329,7 @@
 
         const res = await makeRequest("/api/admin/add-post", "POST", body);
         if (res.success) {
-          alert("Post successfully save ho gayi!");
+          alert("Post successfully saved!");
           document.getElementById("addPostForm").reset();
           loadInitialData();
         } else {
@@ -364,7 +374,11 @@
           </div>
           <div class="form-group">
             <label>Download Original Link</label>
-            <input type="url" id="epLink" class="form-control" placeholder="https://..." required>
+            <input type="url" id="epLink" class="form-control" placeholder="Download link (gplinks directly bypass/shortener)" required>
+          </div>
+          <div class="form-group">
+            <label>Play / Embed Video Link (Dood, StreamWish, Filemoon, etc.)</label>
+            <input type="url" id="epPlayLink" class="form-control" placeholder="https://streamwish.to/e/... embed URL" required>
           </div>
           <button type="submit" class="btn-submit">Save Episode</button>
         </form>
@@ -383,10 +397,11 @@
       }
       
       const original_link = document.getElementById("epLink").value.trim();
+      const play_link = document.getElementById("epPlayLink").value.trim();
 
-      const res = await makeRequest("/api/admin/add-episode", "POST", { post_id: postId, episode_label: epLabel, original_link });
+      const res = await makeRequest("/api/admin/add-episode", "POST", { post_id: postId, episode_label: epLabel, original_link, play_link });
       if (res.success) {
-        alert("Episode successfully add ho gaya!");
+        alert("Episode successfully added!");
         closeModal();
       } else {
         alert("Error: " + res.error);
@@ -498,19 +513,46 @@
       const data = await makeRequest("/api/admin/settings");
       document.getElementById("chanLink").value = data.channel_link || "";
       document.getElementById("groupLink").value = data.group_link || "";
+      document.getElementById("playerPass").value = data.player_password || "";
     }
 
     async function submitSettings(e) {
       e.preventDefault();
       const body = {
         channel_link: document.getElementById("chanLink").value.trim(),
-        group_link: document.getElementById("groupLink").value.trim()
+        group_link: document.getElementById("groupLink").value.trim(),
+        player_password: document.getElementById("playerPass").value.trim()
       };
       const res = await makeRequest("/api/admin/save-settings", "POST", body);
       if (res.success) {
-        alert("Links updated!");
+        alert("Settings successfully updated!");
       } else {
         alert("Error: " + res.error);
+      }
+    }
+
+    async function fetchPremiumUsers() {
+      const container = document.getElementById("premiumUsersList");
+      try {
+        const data = await makeRequest("/api/admin/premium-users");
+        if (data.length === 0) {
+          container.innerHTML = "<div style='padding:20px; text-align:center; color:#777;'>Koi premium active Gmail nahi hai.</div>";
+        } else {
+          container.innerHTML = data.map(u => {
+            const expDate = new Date(u.expires_at).toLocaleDateString('hi-IN');
+            return `
+              <div class="list-item">
+                <div>
+                  <strong>${u.username}</strong><br>
+                  <small style="color: #bbb;">Password: ${u.password} | Expiry: ${expDate}</small>
+                </div>
+                <button class="delete-btn" onclick="deletePremiumUser('${u.id}')">Delete</button>
+              </div>
+            `;
+          }).join("");
+        }
+      } catch (err) {
+        container.innerHTML = `<div style="padding:15px; color:#e50914;">Fetch Error: ${err.message}</div>`;
       }
     }
 
@@ -522,10 +564,23 @@
       };
       const res = await makeRequest("/api/admin/add-premium", "POST", body);
       if (res.success) {
-        alert(`Premium account set kiya gaya!`);
+        alert(`Premium Account standard 28 days ke liye set kiya gaya!`);
         document.getElementById("premiumForm").reset();
+        fetchPremiumUsers();
       } else {
         alert("Error: " + res.error);
+      }
+    }
+
+    async function deletePremiumUser(id) {
+      if (confirm("Kya aap is user ka premium access hataana chahte hain?")) {
+        const res = await makeRequest("/api/admin/delete-premium", "POST", { id });
+        if (res.success) {
+          alert("Premium access successfully deleted.");
+          fetchPremiumUsers();
+        } else {
+          alert("Error: " + res.error);
+        }
       }
     }
 
