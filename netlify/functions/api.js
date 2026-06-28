@@ -29,18 +29,27 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// Auto-Sanitizer for Shortener URLs
+// Advanced Domain extractor: Converts 'https://gplinks.com/member/dashboard' to 'gplinks.com'
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
-  cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
-  cleanUrl = cleanUrl.replace(/^\/+|\/+$/g, "");
+  
+  try {
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      cleanUrl = "https://" + cleanUrl;
+    }
+    const parsed = new URL(cleanUrl);
+    cleanUrl = parsed.hostname; // outputs 'gplinks.com'
+  } catch (e) {
+    cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
+    cleanUrl = cleanUrl.split('/')[0];
+  }
+  
   cleanUrl = cleanUrl.replace(/\s+/g, "");
   cleanKey = cleanKey.replace(/\s+/g, "");
   return { cleanUrl, cleanKey };
 }
 
-// Automatically purge expired premium accounts
 async function cleanExpiredPremiumUsers() {
   if (!supabase) return;
   try {
@@ -51,17 +60,15 @@ async function cleanExpiredPremiumUsers() {
   }
 }
 
-// Bypassing engine for Cloudflare on shorteners
 async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
   const tryUrls = [];
-  tryUrls.push(`https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
   
-  if (cleanUrl.includes("gplinks") && !cleanUrl.startsWith("api.")) {
+  // Try 1: Standard API subdomain
+  if (!cleanUrl.startsWith("api.")) {
     tryUrls.push(`https://api.${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
   }
-  if (!cleanUrl.startsWith("api.") && (cleanUrl.includes("shrinkme") || cleanUrl.includes("shrinkearn"))) {
-    tryUrls.push(`https://api.${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
-  }
+  // Try 2: Main domain API
+  tryUrls.push(`https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
 
   for (const url of tryUrls) {
     try {
@@ -90,7 +97,7 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
         }
       }
     } catch (err) {
-      console.error(`Shortener fetch failed for URL: ${url}`, err.message);
+      console.error(`Shortener fetch failed: ${url}`, err.message);
     }
   }
   return null;
@@ -112,7 +119,6 @@ router.get("/posts", async (req, res) => {
   res.json(data);
 });
 
-// Safe Endpoint: episodes details without direct exposed download/play URLs
 router.get("/episodes/:postId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase
@@ -172,10 +178,15 @@ router.get("/admin/posts", adminAuth, async (req, res) => {
 
 router.post("/admin/add-episode", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { post_id, episode_label, original_link, play_link } = req.body;
+  let { post_id, episode_label, original_link, play_link } = req.body;
+  
+  original_link = (original_link || "").trim();
+  play_link = (play_link || "").trim();
+
   const { data, error } = await supabase.from("episodes").insert({ 
     post_id, episode_label, original_link, play_link 
   }).select();
+  
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, data });
 });
@@ -265,7 +276,6 @@ router.post("/admin/add-premium", adminAuth, async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { username, password } = req.body;
   const expires_at = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
-  // Ensure session_token is cleared on creation so they must log in to get a token
   const { error } = await supabase.from("premium_users").upsert({ 
     username, password, expires_at, session_token: "" 
   }, { onConflict: "username" });
@@ -293,7 +303,11 @@ router.get("/shorten", async (req, res) => {
     if (!post) return res.status(404).json({ error: "Post not found" });
 
     const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
-    if (!ep) return res.status(404).json({ error: "Episode not found" });
+    
+    // ERROR HANDLING: If Download link is empty
+    if (!ep || !ep.original_link) {
+      return res.json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
+    }
 
     const originalLink = ep.original_link;
 
@@ -309,7 +323,7 @@ router.get("/shorten", async (req, res) => {
     const shortLink = await fetchShortlink(cleanUrl, cleanKey, originalLink);
     res.json({ shortLink: shortLink || originalLink });
   } catch (err) {
-    res.json({ shortLink: "", error: err.message });
+    res.json({ error: err.message });
   }
 });
 
@@ -331,9 +345,12 @@ router.post("/verify-player", async (req, res) => {
     if (!post) return res.status(404).json({ error: "Post not found" });
 
     const { data: ep } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
-    if (!ep || !ep.play_link) return res.status(404).json({ error: "Is episode ke liye Stream Video Link uplabdh nahi hai!" });
+    
+    // ERROR HANDLING: If Play link is empty
+    if (!ep || !ep.play_link) {
+      return res.status(404).json({ error: "Is episode ke liye Stream Video Link uplabdh nahi hai!" });
+    }
 
-    // Encrypt link dynamically using Base64 so end users can't copy it easily
     const streamToken = Buffer.from(ep.play_link).toString("base64");
     res.json({ success: true, token: streamToken });
   } catch (err) {
@@ -348,7 +365,6 @@ router.get("/play-stream", (req, res) => {
   const originalUrl = Buffer.from(t, "base64").toString("ascii");
   const videoTitle = title ? decodeURIComponent(title) : "Anime Streaming";
 
-  // Check if link is an embed (like streamwish, doodstream, filemoon, streamtape, etc.) or a raw mp4 video
   const isEmbed = originalUrl.includes("embed") || originalUrl.includes("/e/") || originalUrl.includes("dood") || originalUrl.includes("streamwish") || originalUrl.includes("filemoon") || originalUrl.includes("streamtape") || originalUrl.includes("mixdrop") || originalUrl.includes("filelions") || originalUrl.includes("streamhide");
 
   res.send(`
@@ -377,11 +393,8 @@ router.get("/play-stream", (req, res) => {
       </style>
     </head>
     <body>
-      
-      <!-- TOP AD CARD (Popunders & Banners Code) -->
       <div class="container ad-container banner-top">
         <span>[SPONSORED AD SPOT - PASTE BANNERS OR DIRECT LINK ADS HERE]</span>
-        <!-- Paste your high earning CPM ad scripts here -->
       </div>
 
       <div class="container">
@@ -402,23 +415,19 @@ router.get("/play-stream", (req, res) => {
         </div>
       </div>
 
-      <!-- BOTTOM AD CARD -->
       <div class="container ad-container banner-bottom" style="margin-bottom: 25px;">
         <span>[BOTTOM AD BANNER - INCREASE STREAMING REVENUE]</span>
-        <!-- Paste Adsterra/Adsense banner scripts here -->
       </div>
-
     </body>
     </html>
   `);
 });
 
-// ==================== PREMIUM SYSTEM WITH SESSION DEVICE LOCK ====================
+// ==================== PREMIUM SYSTEM ====================
 
-// Device Lock Authenticate (Updates token in DB and browser)
 router.post("/premium-login", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { username, password } = req.body; // username represents the Gmail ID
+  const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Details missing" });
 
   try {
@@ -435,8 +444,6 @@ router.post("/premium-login", async (req, res) => {
       return res.status(401).json({ error: "Aapka premium standard timeline limit se expire ho chuka hai!" });
     }
 
-    // Generate a fresh unique session token.
-    // If user opens in another device, a new token is generated, instantly logging out the first device!
     const newSessionToken = uuidv4();
     await supabase
       .from("premium_users")
@@ -453,7 +460,6 @@ router.post("/premium-login", async (req, res) => {
   }
 });
 
-// Verified Premium bypass using safe session locking verification
 router.post("/premium-bypass", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { username, session_token, post_name, ep_label } = req.body;
@@ -472,16 +478,19 @@ router.post("/premium-bypass", async (req, res) => {
       return res.status(401).json({ error: "Premium standard trial limit expire ho chuki hai!" });
     }
 
-    // Strictly enforce session device lock
     if (user.session_token !== session_token) {
-      return res.status(403).json({ error: "Device Limit Reached! Is Gmail ID ko doosra device chala raha hai. Pehla device sign-out ho gaya hai!" });
+      return res.status(403).json({ error: "Device Limit Reached! Is Gmail ID ko doosra device chala raha hai." });
     }
 
     const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
     if (!post) return res.status(404).json({ error: "Post not found" });
 
     const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
-    if (!ep) return res.status(404).json({ error: "Episode not found" });
+    
+    // ERROR HANDLING: If Premium user requests an empty download link
+    if (!ep || !ep.original_link) {
+      return res.status(404).json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
+    }
 
     res.json({ success: true, original_link: ep.original_link });
   } catch (err) {
