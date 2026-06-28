@@ -274,7 +274,12 @@
       try {
         const res = await fetch(`/api/shorten?post_name=${encodeURIComponent(postName)}&ep_label=${encodeURIComponent(epLabel)}`);
         const data = await res.json();
-        if (data.shortLink) {
+        
+        // Alert if backend reports any error (e.g., Download Link is empty)
+        if (data.error) {
+          alert(data.error);
+          closeModal();
+        } else if (data.shortLink) {
           window.open(data.shortLink, "_blank");
           closeModal();
         } else {
@@ -328,7 +333,6 @@
       }
     }
 
-    // Check if user has active session already saved in localStorage
     async function checkPremiumOption(postName, epLabel) {
       const savedGmail = localStorage.getItem("premium_gmail");
       const savedToken = localStorage.getItem("premium_session_token");
@@ -346,7 +350,6 @@
             window.open(data.original_link, "_blank");
             closeModal();
           } else {
-            // Token expired or logged in from another device
             alert(data.error || "Session limit expired. Please login again!");
             localStorage.removeItem("premium_gmail");
             localStorage.removeItem("premium_session_token");
@@ -386,11 +389,8 @@
         const data = await res.json();
         
         if (data.success && data.session_token) {
-          // Save session token in current device localStorage
           localStorage.setItem("premium_gmail", data.username);
           localStorage.setItem("premium_session_token", data.session_token);
-          
-          // Request download bypass link using the freshly obtained device session token
           checkPremiumOption(postName, epLabel);
         } else {
           alert(data.error || "Premium Authenticate fail ho gaya!");
