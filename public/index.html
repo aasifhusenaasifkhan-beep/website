@@ -3,63 +3,138 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AnimeSubStudio</title>
+  <title>AnimeSubStudio - Watch Free Anime Sub/Dub</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    :root { --bg: #0f0f0f; --header: rgba(26, 26, 26, 0.95); --primary: #e50914; --text: #fff; --border: #333; }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
-    body { background: var(--bg); color: var(--text); overflow-x: hidden; }
+    :root { 
+      --bg: #09090b; 
+      --header: rgba(18, 18, 22, 0.9); 
+      --card-bg: rgba(22, 22, 26, 0.6);
+      --primary: #e50914; 
+      --primary-glow: rgba(229, 9, 20, 0.35);
+      --text: #ffffff; 
+      --text-muted: #a1a1aa;
+      --border: rgba(255, 255, 255, 0.08); 
+    }
     
-    .header { background: var(--header); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); }
-    .header .logo { font-size: 24px; font-weight: 800; color: var(--primary); cursor: pointer; text-transform: uppercase; letter-spacing: 1.5px; }
-    .search-bar { flex: 1; margin: 0 20px; max-width: 500px; position: relative; }
-    .search-bar input { width: 100%; padding: 12px 45px 12px 20px; border: 1px solid var(--border); border-radius: 30px; background: rgba(30, 30, 30, 0.85); color: white; font-size: 14px; transition: 0.3s; }
-    .search-bar input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 10px rgba(229, 9, 20, 0.5); }
-    .search-bar i { position: absolute; right: 20px; top: 15px; color: #aaa; }
-    .menu-btn { font-size: 24px; cursor: pointer; color: var(--primary); }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', 'Segoe UI', Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); overflow-x: hidden; min-height: 100vh; }
+    
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0c0c0e; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
-    .sidebar { position: fixed; right: -280px; top: 0; width: 280px; height: 100%; background: var(--header); padding: 30px 20px; transition: right 0.3s ease-in-out; z-index: 1000; overflow-y: auto; border-left: 1px solid var(--border); backdrop-filter: blur(15px); }
+    .header { 
+      background: var(--header); 
+      padding: 15px 30px; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      position: sticky; 
+      top: 0; 
+      z-index: 100; 
+      border-bottom: 1px solid var(--border); 
+      backdrop-filter: blur(12px); 
+    }
+    .header .logo { 
+      font-size: 24px; 
+      font-weight: 900; 
+      color: var(--primary); 
+      cursor: pointer; 
+      text-transform: uppercase; 
+      letter-spacing: 1.5px; 
+      text-shadow: 0 0 15px var(--primary-glow);
+    }
+    .search-bar { flex: 1; margin: 0 40px; max-width: 500px; position: relative; }
+    .search-bar input { 
+      width: 100%; 
+      padding: 12px 20px 12px 45px; 
+      border: 1px solid var(--border); 
+      border-radius: 30px; 
+      background: rgba(30, 30, 35, 0.6); 
+      color: white; 
+      font-size: 14px; 
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+    }
+    .search-bar input:focus { 
+      border-color: var(--primary); 
+      outline: none; 
+      box-shadow: 0 0 15px var(--primary-glow);
+      background: rgba(30, 30, 35, 0.9);
+    }
+    .search-bar i { position: absolute; left: 18px; top: 15px; color: #a1a1aa; }
+    .header-right { display: flex; align-items: center; gap: 20px; }
+    .nav-btn { background: none; border: 1px solid var(--border); color: #fff; padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; }
+    .nav-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 10px var(--primary-glow); }
+    .menu-btn { font-size: 24px; cursor: pointer; color: var(--primary); transition: 0.2s; }
+    .menu-btn:hover { transform: scale(1.1); }
+
+    .sidebar { position: fixed; right: -280px; top: 0; width: 280px; height: 100%; background: rgba(15, 15, 20, 0.98); padding: 30px 20px; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; overflow-y: auto; border-left: 1px solid var(--border); backdrop-filter: blur(20px); }
     .sidebar.open { right: 0; }
-    .sidebar h3 { font-size: 20px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
-    .sidebar a { display: block; color: white; padding: 12px 15px; text-decoration: none; margin: 5px 0; border-radius: 5px; font-size: 16px; font-weight: bold; }
-    .sidebar a:hover { background: rgba(229, 9, 20, 0.1); color: var(--primary); }
-    .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; display: none; }
+    .sidebar h3 { font-size: 20px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px; font-weight: 800; text-transform: uppercase; }
+    .sidebar a { display: flex; align-items: center; gap: 12px; color: white; padding: 12px 15px; text-decoration: none; margin: 8px 0; border-radius: 8px; font-size: 15px; font-weight: bold; transition: 0.2s; }
+    .sidebar a:hover { background: rgba(229, 9, 20, 0.1); color: var(--primary); padding-left: 20px; }
+    .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 999; display: none; backdrop-filter: blur(4px); }
     .overlay.show { display: block; }
 
-    .section-title { padding: 30px 20px 10px 20px; font-size: 24px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--primary); font-weight: 800; }
-    .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; padding: 20px; }
-    .post-card { background: rgba(26, 26, 26, 0.8); border-radius: 8px; overflow: hidden; position: relative; cursor: pointer; border: 1px solid var(--border); transition: 0.3s ease; }
-    .post-card:hover { transform: translateY(-8px); border-color: var(--primary); box-shadow: 0 10px 20px rgba(229, 9, 20, 0.3); }
-    .post-card img { width: 100%; height: 230px; object-fit: cover; }
-    .post-card .category-tag { position: absolute; top: 8px; right: 8px; background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-    .post-card .name { padding: 12px; font-size: 14px; text-align: center; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .section-title { padding: 40px 30px 10px 30px; font-size: 26px; text-transform: uppercase; letter-spacing: 1px; color: #fff; font-weight: 800; position: relative; }
+    .section-title span { color: var(--primary); }
+    .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 25px; padding: 20px 30px; }
+    
+    .post-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; position: relative; cursor: pointer; border: 1px solid var(--border); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .post-card:hover { transform: translateY(-8px); border-color: var(--primary); box-shadow: 0 10px 25px var(--primary-glow); }
+    .post-card img { width: 100%; height: 260px; object-fit: cover; transition: 0.4s; }
+    .post-card:hover img { transform: scale(1.05); }
+    .post-card .category-tag { position: absolute; top: 10px; right: 10px; background: var(--primary); color: white; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+    .post-card .name { padding: 15px; font-size: 14px; text-align: center; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .detail-page { display: none; padding: 30px 20px; max-width: 900px; margin: 0 auto; background: rgba(15, 15, 15, 0.9); border-radius: 12px; border: 1px solid var(--border); backdrop-filter: blur(10px); }
+    .detail-page { display: none; padding: 40px 30px; max-width: 1100px; margin: 40px auto; background: rgba(22, 22, 26, 0.8); border-radius: 16px; border: 1px solid var(--border); backdrop-filter: blur(15px); box-shadow: 0 15px 35px rgba(0,0,0,0.6); }
     .detail-page.active { display: block; }
-    .back-btn { background: none; color: var(--primary); border: none; font-size: 18px; cursor: pointer; margin-bottom: 25px; font-weight: bold; transition: 0.2s; }
-    .back-btn:hover { color: white; }
-    .detail-header { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 30px; }
-    .detail-header img { width: 230px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-    .detail-info { flex: 1; min-width: 280px; }
-    .detail-info h2 { font-size: 32px; margin-bottom: 15px; color: var(--primary); font-weight: 800; }
-    .detail-info p { margin-bottom: 12px; font-size: 15px; line-height: 1.6; color: #ccc; }
+    .back-btn { background: none; color: var(--primary); border: 1px solid var(--border); padding: 8px 18px; border-radius: 20px; font-size: 14px; cursor: pointer; margin-bottom: 30px; font-weight: bold; transition: 0.2s; }
+    .back-btn:hover { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 0 12px var(--primary-glow); }
+    .detail-header { display: flex; gap: 40px; flex-wrap: wrap; margin-bottom: 40px; }
+    .detail-header img { width: 260px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 8px 25px rgba(0,0,0,0.8); }
+    .detail-info { flex: 1; min-width: 300px; }
+    .detail-info h2 { font-size: 38px; margin-bottom: 20px; color: var(--primary); font-weight: 900; letter-spacing: -0.5px; text-shadow: 0 0 15px var(--primary-glow); }
+    .detail-info p { margin-bottom: 14px; font-size: 15px; line-height: 1.7; color: var(--text-muted); }
     .detail-info p strong { color: white; }
     
-    .episodes { margin-top: 30px; background: rgba(30, 30, 30, 0.8); padding: 25px; border-radius: 8px; border: 1px solid var(--border); }
-    .episodes h3 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
-    .episodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
-    .episodes button { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
-    .episodes button:hover { background: #b8070e; transform: scale(1.05); }
+    .episodes { margin-top: 40px; background: rgba(15, 15, 20, 0.6); padding: 30px; border-radius: 12px; border: 1px solid var(--border); }
+    .episodes h3 { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 25px; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; font-weight: 800; }
+    .episodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
+    .episodes button { background: #1f1f23; color: white; border: 1px solid var(--border); padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; transition: all 0.2s; }
+    .episodes button:hover { background: var(--primary); border-color: var(--primary); transform: translateY(-3px); box-shadow: 0 5px 15px var(--primary-glow); }
 
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 2000; padding: 20px; backdrop-filter: blur(5px); }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); justify-content: center; align-items: center; z-index: 2000; padding: 20px; backdrop-filter: blur(8px); }
     .modal.active { display: flex; }
-    .modal-box { background: #1a1a1a; border: 1px solid var(--border); padding: 35px; border-radius: 12px; text-align: center; width: 100%; max-width: 400px; position: relative; }
-    .modal-box h3 { margin-bottom: 25px; color: var(--primary); font-size: 22px; }
-    .modal-box input { width: 100%; padding: 12px; margin-bottom: 15px; background: #252525; border: 1px solid var(--border); color: white; border-radius: 6px; text-align: center; font-size: 15px; }
-    .modal-box button { background: var(--primary); color: white; padding: 12px 24px; border: none; border-radius: 6px; margin: 8px; cursor: pointer; font-weight: bold; font-size: 14px; width: calc(50% - 20px); }
-    .modal-box .full-width-btn { width: 100%; margin: 8px 0; }
-    .close-modal { position: absolute; top: 15px; right: 15px; font-size: 22px; cursor: pointer; color: #777; transition: 0.2s; }
+    .modal-box { background: #121214; border: 1px solid var(--border); padding: 40px; border-radius: 16px; text-align: center; width: 100%; max-width: 440px; position: relative; box-shadow: 0 15px 40px rgba(0,0,0,0.8); }
+    .modal-box h3 { margin-bottom: 15px; color: var(--primary); font-size: 24px; font-weight: 800; }
+    .modal-box p { color: var(--text-muted); font-size: 14px; line-height: 1.5; margin-bottom: 25px; }
+    .modal-box input { width: 100%; padding: 14px; margin-bottom: 15px; background: #1a1a1f; border: 1px solid var(--border); color: white; border-radius: 8px; text-align: center; font-size: 15px; transition: 0.3s; }
+    .modal-box input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 10px var(--primary-glow); }
+    .modal-box button { background: var(--primary); color: white; padding: 14px; border: none; border-radius: 8px; margin: 8px 0; cursor: pointer; font-weight: bold; font-size: 14px; width: 100%; transition: 0.2s; }
+    .modal-box button:hover { background: #b8070e; box-shadow: 0 0 12px var(--primary-glow); }
+    .modal-box .secondary-btn { background: #27272a; border: 1px solid var(--border); }
+    .modal-box .secondary-btn:hover { background: #3f3f46; }
+    .close-modal { position: absolute; top: 18px; right: 18px; font-size: 24px; cursor: pointer; color: #777; transition: 0.2s; }
     .close-modal:hover { color: white; }
+
+    @media (max-width: 768px) {
+      .header { padding: 12px 15px; }
+      .search-bar { margin: 0 10px; }
+      .posts-grid { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 15px; padding: 15px; }
+      .post-card img { height: 190px; }
+      .post-card .name { padding: 10px; font-size: 13px; }
+      .detail-page { padding: 20px 15px; margin: 15px; }
+      .detail-header { gap: 20px; justify-content: center; }
+      .detail-header img { width: 180px; }
+      .detail-info { text-align: center; }
+      .detail-info h2 { font-size: 28px; }
+      .episodes { padding: 20px 15px; }
+      .episodes-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+      .header-right .nav-btn { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -70,26 +145,30 @@
       <input type="text" id="searchInput" placeholder="Search by name or genre..." oninput="searchPosts()">
       <i class="fa-solid fa-magnifying-glass"></i>
     </div>
-    <span class="menu-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></span>
+    <div class="header-right">
+      <button class="nav-btn" onclick="openPremiumRequestModal()"><i class="fa-solid fa-gem" style="color: #ffd700;"></i> Free Premium</button>
+      <span class="menu-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></span>
+    </div>
   </div>
 
   <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
   <div class="sidebar" id="sidebar">
     <h3>Filters Menu</h3>
-    <a href="#" onclick="showAllPosts()">All Posts</a>
-    <a href="#" onclick="showSidebarSection('category')">Categories</a>
-    <a href="#" onclick="showSidebarSection('genre')">Genres</a>
-    <a href="#" onclick="showSidebarSection('az')">A2Z 0-9</a>
-    <a href="#" id="tgChannel" target="_blank"><i class="fa-brands fa-telegram"></i> Channel Link</a>
-    <a href="#" id="tgGroup" target="_blank"><i class="fa-brands fa-telegram"></i> Group Link</a>
+    <a href="#" onclick="showAllPosts()"><i class="fa-solid fa-house"></i> All Posts</a>
+    <a href="#" onclick="showSidebarSection('category')"><i class="fa-solid fa-layer-group"></i> Categories</a>
+    <a href="#" onclick="showSidebarSection('genre')"><i class="fa-solid fa-masks-theater"></i> Genres</a>
+    <a href="#" onclick="showSidebarSection('az')"><i class="fa-solid fa-arrow-down-a-z"></i> A2Z List</a>
+    <a href="#" onclick="openPremiumRequestModal()"><i class="fa-solid fa-gem" style="color: #ffd700;"></i> Request Premium</a>
+    <a href="#" id="tgChannel" target="_blank"><i class="fa-brands fa-telegram"></i> Telegram Channel</a>
+    <a href="#" id="tgGroup" target="_blank"><i class="fa-brands fa-telegram"></i> Telegram Group</a>
   </div>
 
   <div id="mainContent">
-    <h2 class="section-title" id="gridTitle">All Posts</h2>
+    <h2 class="section-title" id="gridTitle">All <span>Anime Series</span></h2>
     <div id="postsGrid" class="posts-grid"></div>
     
     <div id="detailPage" class="detail-page">
-      <button class="back-btn" onclick="showHome()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+      <button class="back-btn" onclick="showHome()"><i class="fa-solid fa-arrow-left"></i> Back To Home</button>
       <div id="detailContent"></div>
     </div>
   </div>
@@ -104,20 +183,16 @@
 
     async function loadApp() {
       try {
-        // RLS safety issue solved by fetching via secure Netlify API backend instead of direct Supabase client
         const res = await fetch("/api/posts");
         const data = await res.json();
         if (Array.isArray(data)) {
           allPosts = data;
           renderPosts(allPosts);
-        } else {
-          console.error("Failed to load posts:", data);
         }
       } catch (err) {
         console.error("Error loading posts:", err);
       }
 
-      // Load Settings Links from Express API
       try {
         const setRes = await fetch("/api/settings");
         settings = await setRes.json();
@@ -131,7 +206,7 @@
     function renderPosts(posts) {
       const grid = document.getElementById("postsGrid");
       if(posts.length === 0) {
-        grid.innerHTML = "<div style='grid-column: 1/-1; text-align:center; padding:100px 0; color:#777;'>Koi post nahi mili.</div>";
+        grid.innerHTML = "<div style='grid-column: 1/-1; text-align:center; padding:100px 0; color:#777;'>We couldn't find any anime matches.</div>";
         return;
       }
       grid.innerHTML = posts.map(p => `
@@ -151,7 +226,6 @@
       document.getElementById("gridTitle").style.display = "none";
       document.getElementById("detailPage").classList.add("active");
       
-      // Public Episodes fetch - SECURE (excludes original_link for safety)
       const epRes = await fetch(`/api/episodes/${postId}`);
       const episodes = await epRes.json();
       const normalizedGenres = parseGenres(post.genres).join(", ");
@@ -164,7 +238,7 @@
             <p><strong>Genre:</strong> ${normalizedGenres || "N/A"}</p>
             <p><strong>Release Date:</strong> ${post.release_date || "N/A"}</p>
             <p><strong>Season:</strong> ${post.season || "N/A"}</p>
-            <p><strong>Story:</strong> ${post.short_story || "N/A"}</p>
+            <p><strong>Story Description:</strong> ${post.short_story || "N/A"}</p>
           </div>
         </div>
         <div class="episodes">
@@ -186,15 +260,17 @@
     function handleEpisode(postName, epLabel) {
       showModal(`
         <span class="close-modal" onclick="closeModal()">&times;</span>
-        <h3>${postName}</h3>
-        <p style="margin-bottom:20px; font-weight:bold;">${epLabel}</p>
-        <button class="full-width-btn" onclick="solveShortener('${postName}', '${epLabel}')">Solve Shortener</button>
-        <button class="full-width-btn" style="background:#0066cc;" onclick="openPremiumLogin('${postName}', '${epLabel}')">Premium Login Direct Link</button>
+        <h3 style="color: #e50914;">${postName}</h3>
+        <p style="margin-bottom:20px; font-weight:bold; color: #fff;">${epLabel}</p>
+        
+        <button onclick="solveShortener('${postName}', '${epLabel}')"><i class="fa-solid fa-link"></i> Solve Shortener Download</button>
+        <button onclick="openPlayerPrompt('${postName}', '${epLabel}')" style="background:#00b359;"><i class="fa-solid fa-play"></i> Play Video (Password Protected)</button>
+        <button class="secondary-btn" onclick="checkPremiumOption('${postName}', '${epLabel}')"><i class="fa-solid fa-user-shield"></i> Premium Login Direct Link</button>
       `);
     }
 
     async function solveShortener(postName, epLabel) {
-      showModal(`<h3>Processing...</h3><p>Generating bypass key link, please wait.</p>`);
+      showModal(`<h3>Shortening Link...</h3><p>Please wait, establishing secure gplinks bypass.</p>`);
       try {
         const res = await fetch(`/api/shorten?post_name=${encodeURIComponent(postName)}&ep_label=${encodeURIComponent(epLabel)}`);
         const data = await res.json();
@@ -202,45 +278,152 @@
           window.open(data.shortLink, "_blank");
           closeModal();
         } else {
-          alert("Error generating shortlink: " + data.error);
+          alert("Error: Link Generation failed.");
           closeModal();
         }
       } catch (e) {
-        alert("Server error: " + e.message);
+        alert("Server error occurred.");
         closeModal();
+      }
+    }
+
+    function openPlayerPrompt(postName, epLabel) {
+      showModal(`
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <h3>Watch Stream Setup</h3>
+        <p>Enter the Global Streaming Password to play video</p>
+        <input type="text" id="streamPassInput" placeholder="Password paste karein...">
+        <button onclick="verifyAndStream('${postName}', '${epLabel}')">Validate & Stream Video</button>
+      `);
+    }
+
+    async function verifyAndStream(postName, epLabel) {
+      const password = document.getElementById("streamPassInput").value.trim();
+      if (!password) {
+        alert("Password enter karein.");
+        return;
+      }
+      
+      showModal(`<h3>Loading Video Player...</h3><p>Connecting stream, please wait...</p>`);
+
+      try {
+        const res = await fetch("/api/verify-player", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password, post_name: postName, ep_label: epLabel })
+        });
+        const data = await res.json();
+        
+        if (data.success && data.token) {
+          closeModal();
+          const playerUrl = `/play-stream?t=${data.token}&title=${encodeURIComponent(postName + ' - ' + epLabel)}`;
+          window.open(playerUrl, "_blank");
+        } else {
+          alert(data.error || "Galat streaming password!");
+          openPlayerPrompt(postName, epLabel);
+        }
+      } catch (err) {
+        alert("Playback error: " + err.message);
+        closeModal();
+      }
+    }
+
+    // Check if user has active session already saved in localStorage
+    async function checkPremiumOption(postName, epLabel) {
+      const savedGmail = localStorage.getItem("premium_gmail");
+      const savedToken = localStorage.getItem("premium_session_token");
+
+      if (savedGmail && savedToken) {
+        showModal(`<h3>Direct Loading...</h3><p>Verifying secure device locking session...</p>`);
+        try {
+          const res = await fetch("/api/premium-bypass", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: savedGmail, session_token: savedToken, post_name: postName, ep_label: epLabel })
+          });
+          const data = await res.json();
+          if (data.success && data.original_link) {
+            window.open(data.original_link, "_blank");
+            closeModal();
+          } else {
+            // Token expired or logged in from another device
+            alert(data.error || "Session limit expired. Please login again!");
+            localStorage.removeItem("premium_gmail");
+            localStorage.removeItem("premium_session_token");
+            openPremiumLogin(postName, epLabel);
+          }
+        } catch (err) {
+          localStorage.removeItem("premium_gmail");
+          localStorage.removeItem("premium_session_token");
+          openPremiumLogin(postName, epLabel);
+        }
+      } else {
+        openPremiumLogin(postName, epLabel);
       }
     }
 
     function openPremiumLogin(postName, epLabel) {
       showModal(`
         <span class="close-modal" onclick="closeModal()">&times;</span>
-        <h3>Premium Member Authentication</h3>
-        <input type="text" id="pUser" placeholder="Enter Username">
+        <h3>Premium Authenticate</h3>
+        <p>Direct login via registered Gmail ID & Password</p>
+        <input type="email" id="pUser" placeholder="Enter Gmail ID">
         <input type="password" id="pPass" placeholder="Enter Password">
-        <button class="full-width-btn" onclick="verifyPremium('${postName}', '${epLabel}')">Verify & Access</button>
+        <button onclick="verifyPremium('${postName}', '${epLabel}')">Verify & Bypass Direct Link</button>
       `);
     }
 
     async function verifyPremium(postName, epLabel) {
-      const username = document.getElementById("pUser").value;
-      const password = document.getElementById("pPass").value;
+      const username = document.getElementById("pUser").value.trim();
+      const password = document.getElementById("pPass").value.trim();
 
       try {
         const res = await fetch("/api/premium-login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password, post_name: postName, ep_label: epLabel })
+          body: JSON.stringify({ username, password })
         });
         const data = await res.json();
-        if (data.success && data.original_link) {
-          window.open(data.original_link, "_blank");
-          closeModal();
+        
+        if (data.success && data.session_token) {
+          // Save session token in current device localStorage
+          localStorage.setItem("premium_gmail", data.username);
+          localStorage.setItem("premium_session_token", data.session_token);
+          
+          // Request download bypass link using the freshly obtained device session token
+          checkPremiumOption(postName, epLabel);
         } else {
-          alert(data.error || "Aapka premium check fail ho gaya!");
+          alert(data.error || "Premium Authenticate fail ho gaya!");
         }
       } catch (e) {
         alert("System error: " + e.message);
       }
+    }
+
+    function openPremiumRequestModal() {
+      showModal(`
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <h3 style="color: #ffd700;"><i class="fa-solid fa-gem"></i> Request 28 Days Premium</h3>
+        <p>Enter your Gmail. Owner will verify and activate your premium pass. You can share your password with friends.</p>
+        <input type="email" id="requestGmail" placeholder="yourname@gmail.com" required>
+        <input type="text" id="requestPass" placeholder="Set password you want" required>
+        <button onclick="submitPremiumRequest()">Submit Access Request</button>
+      `);
+    }
+
+    function submitPremiumRequest() {
+      const email = document.getElementById("requestGmail").value.trim();
+      const pass = document.getElementById("requestPass").value.trim();
+      if (!email || !pass) {
+        alert("Dono fields fill karein.");
+        return;
+      }
+      
+      const message = encodeURIComponent(`Hello Admin, Main premium request submit kar raha hoon.\nGmail: ${email}\nPassword: ${pass}\nKindly use this to activate 28 Days Premium for me.`);
+      const tgLink = settings.group_link || settings.channel_link || "https://t.me";
+      alert("Aapka detail secure format me prepare ho gaya hai. Telegram par message bhejkar premium activate karayein!");
+      window.open(`${tgLink}?text=${message}`, "_blank");
+      closeModal();
     }
 
     function showModal(html) {
@@ -256,7 +439,7 @@
     function showHome() {
       document.getElementById("postsGrid").style.display = "";
       document.getElementById("gridTitle").style.display = "";
-      document.getElementById("gridTitle").innerText = "All Posts";
+      document.getElementById("gridTitle").innerHTML = "All <span>Anime Series</span>";
       document.getElementById("detailPage").classList.remove("active");
       loadApp();
     }
@@ -284,7 +467,7 @@
           <span class="close-modal" onclick="closeModal()">&times;</span>
           <h3 style="margin-bottom:15px;">Categories</h3>
           <div style="display:flex; flex-direction:column; gap:10px;">
-            ${categories.map(cat => `<button class="full-width-btn" onclick="filterByCategory('${cat}')">${cat}</button>`).join("")}
+            ${categories.map(cat => `<button style="margin: 4px 0;" onclick="filterByCategory('${cat}')">${cat}</button>`).join("")}
           </div>
         `);
       } else if (type === "genre") {
@@ -293,17 +476,17 @@
         showModal(`
           <span class="close-modal" onclick="closeModal()">&times;</span>
           <h3 style="margin-bottom:15px;">Genres</h3>
-          <div style="display:flex; flex-direction:column; gap:10px; max-height:250px; overflow-y:auto; padding-right:10px;">
-            ${uniqueGenres.map(g => `<button class="full-width-btn" onclick="filterByGenre('${g}')">${g}</button>`).join("")}
+          <div style="display:flex; flex-direction:column; gap:10px; max-height:250px; overflow-y:auto; padding-right:5px;">
+            ${uniqueGenres.map(g => `<button style="margin: 4px 0;" onclick="filterByGenre('${g}')">${g}</button>`).join("")}
           </div>
         `);
       } else if (type === "az") {
         const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
         showModal(`
           <span class="close-modal" onclick="closeModal()">&times;</span>
-          <h3 style="margin-bottom:15px;">A2Z 0-9</h3>
+          <h3 style="margin-bottom:15px;">A2Z Filter</h3>
           <div style="display:grid; grid-template-columns: repeat(6, 1fr); gap:8px;">
-            ${letters.map(l => `<button style="width:100%; margin:0; padding:8px 0;" onclick="filterByLetter('${l}')">${l}</button>`).join("")}
+            ${letters.map(l => `<button style="width:100%; margin:0; padding:10px 0;" onclick="filterByLetter('${l}')">${l}</button>`).join("")}
           </div>
         `);
       }
@@ -311,19 +494,19 @@
 
     function filterByCategory(cat) {
       closeModal();
-      document.getElementById("gridTitle").innerText = cat;
+      document.getElementById("gridTitle").innerHTML = `Category: <span>${cat}</span>`;
       renderPosts(allPosts.filter(p => p.category === cat));
     }
 
     function filterByGenre(genre) {
       closeModal();
-      document.getElementById("gridTitle").innerText = "Genre: " + genre;
+      document.getElementById("gridTitle").innerHTML = `Genre: <span>${genre}</span>`;
       renderPosts(allPosts.filter(p => parseGenres(p.genres).some(g => g.toLowerCase() === genre.toLowerCase())));
     }
 
     function filterByLetter(letter) {
       closeModal();
-      document.getElementById("gridTitle").innerText = "Filter: " + letter;
+      document.getElementById("gridTitle").innerHTML = `Starting Letter: <span>${letter}</span>`;
       renderPosts(allPosts.filter(p => p.name.toUpperCase().startsWith(letter)));
     }
 
