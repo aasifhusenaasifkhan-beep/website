@@ -29,7 +29,7 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// Advanced Domain extractor: Converts 'https://gplinks.com/member/dashboard' to 'gplinks.com'
+// Advanced Domain extractor: Converts 'https://app.bitly.com/Bq6sfFja0Zz/home' to 'app.bitly.com'
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
@@ -39,7 +39,7 @@ function sanitizeShortener(dashUrl, apiKey) {
       cleanUrl = "https://" + cleanUrl;
     }
     const parsed = new URL(cleanUrl);
-    cleanUrl = parsed.hostname; // outputs 'gplinks.com'
+    cleanUrl = parsed.hostname;
   } catch (e) {
     cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
     cleanUrl = cleanUrl.split('/')[0];
@@ -60,14 +60,40 @@ async function cleanExpiredPremiumUsers() {
   }
 }
 
+// Highly robust fetch function with native Bitly and AdlinkFly support
 async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
-  const tryUrls = [];
   
-  // Try 1: Standard API subdomain
+  // 1. NATIVE BITLY (v4) SUPPORT
+  if (cleanUrl.includes("bitly")) {
+    try {
+      const response = await fetch("https://api-ssl.bitly.com/v4/shorten", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${cleanKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ long_url: originalLink })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.link) {
+          return data.link; // Returns 'https://bit.ly/xxxx'
+        }
+      } else {
+        const errText = await response.text();
+        console.error("Bitly API responded with error:", response.status, errText);
+      }
+    } catch (err) {
+      console.error("Bitly shortening exception:", err.message);
+    }
+    return null;
+  }
+
+  // 2. STANDARD ADLINKFLY SUPPORT (GPLinks, ShrinkMe, etc.)
+  const tryUrls = [];
   if (!cleanUrl.startsWith("api.")) {
     tryUrls.push(`https://api.${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
   }
-  // Try 2: Main domain API
   tryUrls.push(`https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`);
 
   for (const url of tryUrls) {
@@ -97,7 +123,7 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
         }
       }
     } catch (err) {
-      console.error(`Shortener fetch failed: ${url}`, err.message);
+      console.error(`Shortener fetch failed for URL: ${url}`, err.message);
     }
   }
   return null;
@@ -304,7 +330,6 @@ router.get("/shorten", async (req, res) => {
 
     const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
     
-    // ERROR HANDLING: If Download link is empty
     if (!ep || !ep.original_link) {
       return res.json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
     }
@@ -313,6 +338,7 @@ router.get("/shorten", async (req, res) => {
 
     const { data: shorteners } = await supabase.from("shorteners").select("*");
     if (!shorteners || shorteners.length === 0) {
+      // If no shortener is added in DB, allow direct download
       return res.json({ shortLink: originalLink });
     }
 
@@ -321,9 +347,15 @@ router.get("/shorten", async (req, res) => {
     const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
     
     const shortLink = await fetchShortlink(cleanUrl, cleanKey, originalLink);
-    res.json({ shortLink: shortLink || originalLink });
+    
+    if (shortLink && shortLink.startsWith("http")) {
+      res.json({ shortLink });
+    } else {
+      // ANTI-BYPASS SECURITY: Never send original direct link on shortener API failure
+      res.json({ error: "Shortener API currently busy ya down hai! Kripya thodi der baad firse prayas karein." });
+    }
   } catch (err) {
-    res.json({ error: err.message });
+    res.json({ error: "Shortener process execution error: " + err.message });
   }
 });
 
@@ -346,7 +378,6 @@ router.post("/verify-player", async (req, res) => {
 
     const { data: ep } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
     
-    // ERROR HANDLING: If Play link is empty
     if (!ep || !ep.play_link) {
       return res.status(404).json({ error: "Is episode ke liye Stream Video Link uplabdh nahi hai!" });
     }
@@ -487,7 +518,6 @@ router.post("/premium-bypass", async (req, res) => {
 
     const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
     
-    // ERROR HANDLING: If Premium user requests an empty download link
     if (!ep || !ep.original_link) {
       return res.status(404).json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
     }
