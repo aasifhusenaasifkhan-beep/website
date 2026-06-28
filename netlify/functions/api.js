@@ -66,7 +66,7 @@ router.get("/episodes/:postId", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
   const { data, error } = await supabase
     .from("episodes")
-    .select("id, post_id, episode_label") // Excluded original_link
+    .select("id, post_id, episode_label")
     .eq("post_id", req.params.postId)
     .order("created_at", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
@@ -214,7 +214,7 @@ router.post("/admin/add-premium", adminAuth, async (req, res) => {
   res.json({ success: true, expires_at });
 });
 
-// ==================== SHORTLINK SECURE ENGINE ====================
+// ==================== SHORTLINK SECURE ENGINE (WITH AUTOMATIC FAILSAFE SHIELD) ====================
 
 router.get("/shorten", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
@@ -239,21 +239,45 @@ router.get("/shorten", async (req, res) => {
     const rawShortener = shorteners[randomIndex];
 
     const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
-    const apiUrl = `https://${cleanUrl}/api/${cleanKey}?url=${encodeURIComponent(originalLink)}`;
+    
+    // Auto-formatting for gplinks domain prefix
+    let host = cleanUrl;
+    if (host.includes("gplinks") && !host.startsWith("api.")) {
+      host = "api." + host;
+    }
+    
+    // Correct standard parameters format: ?api=API_KEY&url=URL
+    const apiUrl = `https://${host}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`;
 
     const response = await fetch(apiUrl);
+    if (!response.ok) {
+      // API error fallback to avoid about:blank
+      return res.json({ shortLink: originalLink, error: `API status: ${response.status}` });
+    }
+
     const text = await response.text();
-    let shortLink = text.trim();
+    let shortLink = "";
 
     try {
       const json = JSON.parse(text);
-      shortLink = json.shortenedUrl || json.short_url || json.url || text;
-    } catch (e) {}
+      shortLink = json.shortenedUrl || json.short_url || json.url || "";
+    } catch (e) {
+      // Plain text API URL handling
+      if (text.startsWith("http://") || text.startsWith("https://")) {
+        shortLink = text.trim();
+      }
+    }
+
+    // Safety check: if shortLink is empty, serve original direct link
+    if (!shortLink || !shortLink.startsWith("http")) {
+      shortLink = originalLink;
+    }
 
     res.json({ shortLink });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // If backend system fails, automatically send the original direct link
+    res.json({ shortLink: originalLink, error: err.message });
   }
 });
 
@@ -293,6 +317,5 @@ app.use("/api", router);
 app.use("/.netlify/functions/api", router);
 app.use("/", router);
 
-// SERVERLESS HANDLER EXPORT
 const handler = serverless(app);
 module.exports = { handler };
