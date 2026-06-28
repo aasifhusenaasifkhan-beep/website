@@ -245,7 +245,7 @@
           <h3>EPISODE LIST</h3>
           <div class="episodes-grid">
             ${episodes.map(ep => `
-              <button onclick="handleEpisode('${post.name}', '${ep.episode_label}')">${ep.episode_label}</button>
+              <button onclick="handleEpisode('${post.id}', '${post.name.replace(/'/g, "\\'")}', '${ep.id}', '${ep.episode_label.replace(/'/g, "\\'")}')">${ep.episode_label}</button>
             `).join("")}
           </div>
         </div>
@@ -257,25 +257,24 @@
       return genreStr.replace(/[,;\-_]/g, ' ').split(/\s+/).map(g => g.trim()).filter(Boolean);
     }
 
-    function handleEpisode(postName, epLabel) {
+    function handleEpisode(postId, postName, epId, epLabel) {
       showModal(`
         <span class="close-modal" onclick="closeModal()">&times;</span>
         <h3 style="color: #e50914;">${postName}</h3>
         <p style="margin-bottom:20px; font-weight:bold; color: #fff;">${epLabel}</p>
         
-        <button onclick="solveShortener('${postName}', '${epLabel}')"><i class="fa-solid fa-link"></i> Solve Shortener Download</button>
-        <button onclick="openPlayerPrompt('${postName}', '${epLabel}')" style="background:#00b359;"><i class="fa-solid fa-play"></i> Play Video (Password Protected)</button>
-        <button class="secondary-btn" onclick="checkPremiumOption('${postName}', '${epLabel}')"><i class="fa-solid fa-user-shield"></i> Premium Login Direct Link</button>
+        <button onclick="solveShortener('${epId}', '${postName.replace(/'/g, "\\'")}', '${epLabel.replace(/'/g, "\\'")}')"><i class="fa-solid fa-link"></i> Solve Shortener Download</button>
+        <button onclick="openPlayerPrompt('${postId}', '${postName.replace(/'/g, "\\'")}', '${epId}', '${epLabel.replace(/'/g, "\\'")}')" style="background:#00b359;"><i class="fa-solid fa-play"></i> Play Video (Password Protected)</button>
+        <button class="secondary-btn" onclick="checkPremiumOption('${postId}', '${postName.replace(/'/g, "\\'")}', '${epId}', '${epLabel.replace(/'/g, "\\'")}')"><i class="fa-solid fa-user-shield"></i> Premium Login Direct Link</button>
       `);
     }
 
-    async function solveShortener(postName, epLabel) {
-      showModal(`<h3>Shortening Link...</h3><p>Please wait, establishing secure gplinks bypass.</p>`);
+    async function solveShortener(epId, postName, epLabel) {
+      showModal(`<h3>Shortening Link...</h3><p>Please wait, establishing secure bypass...</p>`);
       try {
-        const res = await fetch(`/api/shorten?post_name=${encodeURIComponent(postName)}&ep_label=${encodeURIComponent(epLabel)}`);
+        const res = await fetch(`/api/shorten?ep_id=${encodeURIComponent(epId)}&post_name=${encodeURIComponent(postName)}&ep_label=${encodeURIComponent(epLabel)}`);
         const data = await res.json();
         
-        // Alert if backend reports any error (e.g., Download Link is empty)
         if (data.error) {
           alert(data.error);
           closeModal();
@@ -292,17 +291,17 @@
       }
     }
 
-    function openPlayerPrompt(postName, epLabel) {
+    function openPlayerPrompt(postId, postName, epId, epLabel) {
       showModal(`
         <span class="close-modal" onclick="closeModal()">&times;</span>
         <h3>Watch Stream Setup</h3>
         <p>Enter the Global Streaming Password to play video</p>
         <input type="text" id="streamPassInput" placeholder="Password paste karein...">
-        <button onclick="verifyAndStream('${postName}', '${epLabel}')">Validate & Stream Video</button>
+        <button onclick="verifyAndStream('${postId}', '${postName.replace(/'/g, "\\'")}', '${epId}', '${epLabel.replace(/'/g, "\\'")}')">Validate & Stream Video</button>
       `);
     }
 
-    async function verifyAndStream(postName, epLabel) {
+    async function verifyAndStream(postId, postName, epId, epLabel) {
       const password = document.getElementById("streamPassInput").value.trim();
       if (!password) {
         alert("Password enter karein.");
@@ -315,7 +314,7 @@
         const res = await fetch("/api/verify-player", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password, post_name: postName, ep_label: epLabel })
+          body: JSON.stringify({ password, post_name: postName, ep_label: epLabel, ep_id: epId })
         });
         const data = await res.json();
         
@@ -325,7 +324,7 @@
           window.open(playerUrl, "_blank");
         } else {
           alert(data.error || "Galat streaming password!");
-          openPlayerPrompt(postName, epLabel);
+          openPlayerPrompt(postId, postName, epId, epLabel);
         }
       } catch (err) {
         alert("Playback error: " + err.message);
@@ -333,7 +332,7 @@
       }
     }
 
-    async function checkPremiumOption(postName, epLabel) {
+    async function checkPremiumOption(postId, postName, epId, epLabel) {
       const savedGmail = localStorage.getItem("premium_gmail");
       const savedToken = localStorage.getItem("premium_session_token");
 
@@ -343,7 +342,7 @@
           const res = await fetch("/api/premium-bypass", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: savedGmail, session_token: savedToken, post_name: postName, ep_label: epLabel })
+            body: JSON.stringify({ username: savedGmail, session_token: savedToken, post_name: postName, ep_label: epLabel, ep_id: epId })
           });
           const data = await res.json();
           if (data.success && data.original_link) {
@@ -353,30 +352,30 @@
             alert(data.error || "Session limit expired. Please login again!");
             localStorage.removeItem("premium_gmail");
             localStorage.removeItem("premium_session_token");
-            openPremiumLogin(postName, epLabel);
+            openPremiumLogin(postId, postName, epId, epLabel);
           }
         } catch (err) {
           localStorage.removeItem("premium_gmail");
           localStorage.removeItem("premium_session_token");
-          openPremiumLogin(postName, epLabel);
+          openPremiumLogin(postId, postName, epId, epLabel);
         }
       } else {
-        openPremiumLogin(postName, epLabel);
+        openPremiumLogin(postId, postName, epId, epLabel);
       }
     }
 
-    function openPremiumLogin(postName, epLabel) {
+    function openPremiumLogin(postId, postName, epId, epLabel) {
       showModal(`
         <span class="close-modal" onclick="closeModal()">&times;</span>
         <h3>Premium Authenticate</h3>
         <p>Direct login via registered Gmail ID & Password</p>
         <input type="email" id="pUser" placeholder="Enter Gmail ID">
         <input type="password" id="pPass" placeholder="Enter Password">
-        <button onclick="verifyPremium('${postName}', '${epLabel}')">Verify & Bypass Direct Link</button>
+        <button onclick="verifyPremium('${postId}', '${postName.replace(/'/g, "\\'")}', '${epId}', '${epLabel.replace(/'/g, "\\'")}')">Verify & Bypass Direct Link</button>
       `);
     }
 
-    async function verifyPremium(postName, epLabel) {
+    async function verifyPremium(postId, postName, epId, epLabel) {
       const username = document.getElementById("pUser").value.trim();
       const password = document.getElementById("pPass").value.trim();
 
@@ -391,7 +390,7 @@
         if (data.success && data.session_token) {
           localStorage.setItem("premium_gmail", data.username);
           localStorage.setItem("premium_session_token", data.session_token);
-          checkPremiumOption(postName, epLabel);
+          checkPremiumOption(postId, postName, epId, epLabel);
         } else {
           alert(data.error || "Premium Authenticate fail ho gaya!");
         }
