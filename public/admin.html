@@ -62,7 +62,6 @@
 </head>
 <body>
 
-  <!-- Login Shield -->
   <div id="loginScreen">
     <div class="login-box">
       <h2>AnimeSubStudio Admin</h2>
@@ -373,12 +372,12 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Download Original Link</label>
-            <input type="url" id="epLink" class="form-control" placeholder="Download link (gplinks directly bypass/shortener)" required>
+            <label>Download Original Link (Optional)</label>
+            <input type="url" id="epLink" class="form-control" placeholder="Download link (gplinks bypass)">
           </div>
           <div class="form-group">
-            <label>Play / Embed Video Link (Dood, StreamWish, Filemoon, etc.)</label>
-            <input type="url" id="epPlayLink" class="form-control" placeholder="https://streamwish.to/e/... embed URL" required>
+            <label>Play / Embed Video Link (Optional)</label>
+            <input type="url" id="epPlayLink" class="form-control" placeholder="https://streamwish.to/e/... embed URL">
           </div>
           <button type="submit" class="btn-submit">Save Episode</button>
         </form>
@@ -398,6 +397,12 @@
       
       const original_link = document.getElementById("epLink").value.trim();
       const play_link = document.getElementById("epPlayLink").value.trim();
+
+      // Conditional Validation: At least one link is required
+      if (!original_link && !play_link) {
+        alert("Kam-se-kam ek link (Download Link ya Play Link) daalna zaroori hai!");
+        return;
+      }
 
       const res = await makeRequest("/api/admin/add-episode", "POST", { post_id: postId, episode_label: epLabel, original_link, play_link });
       if (res.success) {
@@ -564,7 +569,7 @@
       };
       const res = await makeRequest("/api/admin/add-premium", "POST", body);
       if (res.success) {
-        alert(`Premium Account standard 28 days ke liye set kiya gaya!`);
+        alert(`Premium Account set kiya gaya!`);
         document.getElementById("premiumForm").reset();
         fetchPremiumUsers();
       } else {
