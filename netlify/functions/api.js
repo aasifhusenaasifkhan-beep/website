@@ -29,57 +29,25 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// Robust URL Sanitizer: Safely preserves host, subdomain, and custom paths (like /member/tools/api or /api/v1)
+// URL Sanitizer: Extracts ONLY host domain
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
   
-  // Clean apiKey - remove any whitespace, but preserve special characters if any
-  cleanKey = cleanKey.replace(/\s+/g, "");
-
   try {
-    // Standardize protocol
     if (!/^https?:\/\//i.test(cleanUrl)) {
       cleanUrl = "https://" + cleanUrl;
     }
     const parsed = new URL(cleanUrl);
-    let host = parsed.hostname;
-    let path = parsed.pathname;
-
-    // Clean up path: remove trailing slash, and remove redundant query/hash
-    if (path.endsWith("/")) {
-      path = path.slice(0, -1);
-    }
-
-    if (path === "" || path === "/") {
-      cleanUrl = host;
-    } else {
-      cleanUrl = host + path;
-    }
+    cleanUrl = parsed.hostname;
   } catch (e) {
-    // Fallback if URL parsing fails
     cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
-    cleanUrl = cleanUrl.split('?')[0].split('#')[0];
-    if (cleanUrl.endsWith("/")) {
-      cleanUrl = cleanUrl.slice(0, -1);
-    }
+    cleanUrl = cleanUrl.split('/')[0];
   }
-
-  // Final trim and safety check
+  
   cleanUrl = cleanUrl.replace(/\s+/g, "");
+  cleanKey = cleanKey.replace(/\s+/g, "");
   return { cleanUrl, cleanKey };
-}
-
-// Appends a unique cache-buster/click param to force fresh shortened link generation on each request
-function appendRandomParam(url) {
-  try {
-    const parsed = new URL(url);
-    parsed.searchParams.set("_c", Math.random().toString(36).substring(2, 9) + Date.now().toString().slice(-5));
-    return parsed.toString();
-  } catch (e) {
-    const separator = url.includes("?") ? "&" : "?";
-    return url + separator + "_c=" + Math.random().toString(36).substring(2, 9) + Date.now().toString().slice(-5);
-  }
 }
 
 async function cleanExpiredPremiumUsers() {
@@ -92,11 +60,11 @@ async function cleanExpiredPremiumUsers() {
   }
 }
 
-// Universal Shortener Fetcher: Supports Bitly (v4 POST) & standard shorteners (GET)
+// Universal Shortener Fetcher: Supports Bitly & standard shorteners with automatic api. subdomain routing
 async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
   
   // 1. NATIVE BITLY (v4 API) SUPPORT
-  if (cleanUrl.includes("bitly")) {
+  if (cleanUrl.toLowerCase().includes("bitly")) {
     try {
       const response = await fetch("https://api-ssl.bitly.com/v4/shorten", {
         method: "POST",
@@ -108,12 +76,9 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
       });
       if (response.ok) {
         const data = await response.json();
-        if (data && data.link) {
+        if (data && data.link && data.link.toLowerCase().trim() !== originalLink.toLowerCase().trim()) {
           return data.link;
         }
-      } else {
-        const errText = await response.text();
-        console.error("Bitly API Error:", response.status, errText);
       }
     } catch (err) {
       console.error("Bitly shortening failed:", err.message);
@@ -122,42 +87,47 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
   }
 
   // 2. UNIVERSAL SUPPORT FOR ALL OTHER SHORTENERS (GPLinks, ShrtFly, ShrinkMe, Clk.sh, etc.)
-  // Calls the domain directly as configured to avoid timeout issues
-  const hasPath = cleanUrl.includes("/");
-  const apiUrl = hasPath 
-    ? `https://${cleanUrl}?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`
-    : `https://${cleanUrl}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`;
+  // Automatically tries both the direct domain and the 'api.' subdomain variant on failures
+  const domainsToTry = [cleanUrl];
+  if (!cleanUrl.startsWith("api.") && !cleanUrl.startsWith("www.")) {
+    domainsToTry.push("api." + cleanUrl);
+  }
 
-  try {
-    const response = await fetch(apiUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*"
-      },
-      timeout: 5000 // 5 Seconds fast timeout to prevent Netlify serverless crash
-    });
-    
-    if (response.ok) {
-      const text = await response.text();
-      let shortLink = "";
-      try {
-        const json = JSON.parse(text);
-        shortLink = json.shortenedUrl || json.shortened_url || json.short_url || json.url || json.link || (json.data && (json.data.short_url || json.data.shortenedUrl || json.data.url)) || "";
-      } catch (e) {
-        // Regex fallback to pull out any URL in case plain text formatting has wrappers
-        const urlRegex = /(https?:\/\/[^\s"'<>]+)/i;
-        const match = text.match(urlRegex);
-        if (match) {
-          shortLink = match[0].trim();
+  for (const domain of domainsToTry) {
+    const apiUrl = `https://${domain}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`;
+    try {
+      const response = await fetch(apiUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*"
+        },
+        timeout: 5000
+      });
+      
+      if (response.ok) {
+        const text = await response.text();
+        let shortLink = "";
+        try {
+          const json = JSON.parse(text);
+          // Only map properties on clear successful statuses to prevent capturing input URLs inside error payloads
+          if (json.status === "success" || !json.status || json.status === 200) {
+            shortLink = json.shortenedUrl || json.short_url || json.url || json.short_link || "";
+          }
+        } catch (e) {
+          if (text.startsWith("http://") || text.startsWith("https://")) {
+            shortLink = text.trim();
+          }
+        }
+        
+        // Strict Validation: Confirm the generated link is NOT identical to the original link
+        if (shortLink && shortLink.startsWith("http") && shortLink.toLowerCase().trim() !== originalLink.toLowerCase().trim()) {
+          return shortLink;
         }
       }
-      if (shortLink && shortLink.startsWith("http")) {
-        return shortLink;
-      }
+    } catch (err) {
+      console.error(`Shortener fetch failed for domain variant: ${domain}`, err.message);
     }
-  } catch (err) {
-    console.error(`Shortener fetch failed for domain: ${cleanUrl}`, err.message);
   }
   return null;
 }
@@ -354,53 +324,50 @@ router.post("/admin/delete-premium", adminAuth, async (req, res) => {
 
 router.get("/shorten", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { post_name, ep_label, ep_id } = req.query;
+  const { post_name, ep_label } = req.query;
+  if (!post_name || !ep_label) return res.status(400).json({ error: "Missing parameters" });
 
   try {
-    let ep = null;
-    // Fast ID-based lookup to bypass string encoding/mismatch bugs on old/special episodes
-    if (ep_id) {
-      const { data } = await supabase.from("episodes").select("original_link").eq("id", ep_id).single();
-      ep = data;
-    } else if (post_name && ep_label) {
-      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name.trim()).single();
-      if (post) {
-        const { data } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label.trim()).single();
-        ep = data;
-      }
-    }
+    const cleanPostName = post_name.trim();
+    const cleanEpLabel = ep_label.trim();
+
+    // Querying with .ilike and .trim() ensures case insensitivity and handles formatting matches on old episodes
+    const { data: post } = await supabase.from("posts").select("id").ilike("name", cleanPostName).single();
+    if (!post) return res.status(404).json({ error: "Post not found" });
+
+    const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).ilike("episode_label", cleanEpLabel).single();
     
     if (!ep || !ep.original_link) {
       return res.json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
     }
 
     const originalLink = ep.original_link;
-    // Add cache-busting to ensure that the shortener service registers view counts on every unique click
-    const uniqueOriginalLink = appendRandomParam(originalLink);
 
     const { data: shorteners } = await supabase.from("shorteners").select("*");
     if (!shorteners || shorteners.length === 0) {
-      // SECURITY SHIELD: Return error if shorteners are missing to avoid giving raw unshortened links
-      return res.json({ error: "Koi active shortener account configured nahi mila! Kripya admin se kahin active shorteners add karein." });
+      // SECURITY SHIELD: Return error if shorteners are missing to avoid giving raw original link bypass
+      return res.json({ error: "Koi shortener account configured nahi hai! Kripya admin settings me account connect karein." });
     }
 
-    // Shuffle shorteners to load-balance traffic, and sequentially try them on network failures
+    // Shuffling configured shorteners to distribute traffic randomly, while keeping them sequential for failover loops
     const shuffledShorteners = [...shorteners].sort(() => Math.random() - 0.5);
     
     let shortLink = null;
     
+    // Sequential Retry Fallback: Tries all configured shorteners before returning an error
     for (const rawShortener of shuffledShorteners) {
       const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
-      shortLink = await fetchShortlink(cleanUrl, cleanKey, uniqueOriginalLink);
+      shortLink = await fetchShortlink(cleanUrl, cleanKey, originalLink);
       if (shortLink && shortLink.startsWith("http")) {
-        break; // Stop iterating as soon as we successfully get a shortened URL
+        break; // Stop immediately once a short link has successfully been generated
       }
     }
     
     if (shortLink && shortLink.startsWith("http")) {
       res.json({ shortLink });
     } else {
-      res.json({ error: "Shortener APIs down ya busy hain! Kripya thodi der baad dobara koshish karein." });
+      // SECURITY SHIELD: Never leak direct original link if shortening calls fail
+      res.json({ error: "Shortener system is temporarily down or API Keys are invalid. Please contact the administrator." });
     }
   } catch (err) {
     res.json({ error: "Shortener process execution error: " + err.message });
@@ -411,7 +378,7 @@ router.get("/shorten", async (req, res) => {
 
 router.post("/verify-player", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { password, post_name, ep_label, ep_id } = req.body;
+  const { password, post_name, ep_label } = req.body;
 
   try {
     const { data: settings } = await supabase.from("settings").select("player_password").eq("id", 1).single();
@@ -421,17 +388,10 @@ router.post("/verify-player", async (req, res) => {
       return res.status(401).json({ error: "Streaming password galat hai!" });
     }
 
-    let ep = null;
-    if (ep_id) {
-      const { data } = await supabase.from("episodes").select("play_link").eq("id", ep_id).single();
-      ep = data;
-    } else if (post_name && ep_label) {
-      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name.trim()).single();
-      if (post) {
-        const { data } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label.trim()).single();
-        ep = data;
-      }
-    }
+    const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
+    if (!post) return res.status(404).json({ error: "Post not found" });
+
+    const { data: ep } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
     
     if (!ep || !ep.play_link) {
       return res.status(404).json({ error: "Is episode ke liye Stream Video Link uplabdh nahi hai!" });
@@ -548,7 +508,7 @@ router.post("/premium-login", async (req, res) => {
 
 router.post("/premium-bypass", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { username, session_token, post_name, ep_label, ep_id } = req.body;
+  const { username, session_token, post_name, ep_label } = req.body;
   if (!username || !session_token) return res.status(401).json({ error: "Aap logged in nahi hain!" });
 
   try {
@@ -568,17 +528,10 @@ router.post("/premium-bypass", async (req, res) => {
       return res.status(403).json({ error: "Device Limit Reached! Is Gmail ID ko doosra device chala raha hai." });
     }
 
-    let ep = null;
-    if (ep_id) {
-      const { data } = await supabase.from("episodes").select("original_link").eq("id", ep_id).single();
-      ep = data;
-    } else if (post_name && ep_label) {
-      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name.trim()).single();
-      if (post) {
-        const { data } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label.trim()).single();
-        ep = data;
-      }
-    }
+    const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
+    if (!post) return res.status(404).json({ error: "Post not found" });
+
+    const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
     
     if (!ep || !ep.original_link) {
       return res.status(404).json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
