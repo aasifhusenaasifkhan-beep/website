@@ -29,7 +29,7 @@ const adminAuth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized. Galat password!" });
 };
 
-// URL Sanitizer: Extracts ONLY host domain
+// URL Sanitizer: Safely extracts only the base host domain
 function sanitizeShortener(dashUrl, apiKey) {
   let cleanUrl = (dashUrl || "").trim();
   let cleanKey = (apiKey || "").trim();
@@ -39,7 +39,7 @@ function sanitizeShortener(dashUrl, apiKey) {
       cleanUrl = "https://" + cleanUrl;
     }
     const parsed = new URL(cleanUrl);
-    cleanUrl = parsed.hostname;
+    cleanUrl = parsed.hostname; 
   } catch (e) {
     cleanUrl = cleanUrl.replace(/^(https?:\/\/|https?\/|https?:|http?:)/i, "");
     cleanUrl = cleanUrl.split('/')[0];
@@ -48,6 +48,18 @@ function sanitizeShortener(dashUrl, apiKey) {
   cleanUrl = cleanUrl.replace(/\s+/g, "");
   cleanKey = cleanKey.replace(/\s+/g, "");
   return { cleanUrl, cleanKey };
+}
+
+// Appends unique parameter so shortener services record separate view transactions on every single request
+function appendRandomParam(url) {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("_c", Math.random().toString(36).substring(2, 9) + Date.now().toString().slice(-5));
+    return parsed.toString();
+  } catch (e) {
+    const separator = url.includes("?") ? "&" : "?";
+    return url + separator + "_c=" + Math.random().toString(36).substring(2, 9) + Date.now().toString().slice(-5);
+  }
 }
 
 async function cleanExpiredPremiumUsers() {
@@ -61,7 +73,7 @@ async function cleanExpiredPremiumUsers() {
 }
 
 // Universal Shortener Fetcher: Supports Bitly & standard shorteners with automatic api. subdomain routing
-async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
+async function fetchShortlink(cleanUrl, cleanKey, originalLink, uniqueOriginalLink) {
   
   // 1. NATIVE BITLY (v4 API) SUPPORT
   if (cleanUrl.toLowerCase().includes("bitly")) {
@@ -72,7 +84,7 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
           "Authorization": `Bearer ${cleanKey}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ long_url: originalLink })
+        body: JSON.stringify({ long_url: uniqueOriginalLink })
       });
       if (response.ok) {
         const data = await response.json();
@@ -86,15 +98,14 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
     return null;
   }
 
-  // 2. UNIVERSAL SUPPORT FOR ALL OTHER SHORTENERS (GPLinks, ShrtFly, ShrinkMe, Clk.sh, etc.)
-  // Automatically tries both the direct domain and the 'api.' subdomain variant on failures
+  // 2. UNIVERSAL SUPPORT FOR STANDARD SHORTENERS (GPLinks, ShrtFly, ShrinkMe, Clk.sh, etc.)
   const domainsToTry = [cleanUrl];
   if (!cleanUrl.startsWith("api.") && !cleanUrl.startsWith("www.")) {
     domainsToTry.push("api." + cleanUrl);
   }
 
   for (const domain of domainsToTry) {
-    const apiUrl = `https://${domain}/api?api=${cleanKey}&url=${encodeURIComponent(originalLink)}`;
+    const apiUrl = `https://${domain}/api?api=${cleanKey}&url=${encodeURIComponent(uniqueOriginalLink)}`;
     try {
       const response = await fetch(apiUrl, {
         method: "GET",
@@ -102,7 +113,7 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept": "application/json, text/plain, */*"
         },
-        timeout: 5000
+        timeout: 5000 
       });
       
       if (response.ok) {
@@ -110,9 +121,9 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
         let shortLink = "";
         try {
           const json = JSON.parse(text);
-          // Only map properties on clear successful statuses to prevent capturing input URLs inside error payloads
+          // Only map properties on successful requests to avoid taking target URL from error payloads
           if (json.status === "success" || !json.status || json.status === 200) {
-            shortLink = json.shortenedUrl || json.short_url || json.url || json.short_link || "";
+            shortLink = json.shortenedUrl || json.short_url || json.url || json.link || "";
           }
         } catch (e) {
           if (text.startsWith("http://") || text.startsWith("https://")) {
@@ -120,8 +131,8 @@ async function fetchShortlink(cleanUrl, cleanKey, originalLink) {
           }
         }
         
-        // Strict Validation: Confirm the generated link is NOT identical to the original link
-        if (shortLink && shortLink.startsWith("http") && shortLink.toLowerCase().trim() !== originalLink.toLowerCase().trim()) {
+        // Strict Validation: Ensure parsed shortlink is NOT identical to the raw link (blocks error bypass)
+        if (shortLink && shortLink.startsWith("http") && shortLink.toLowerCase().trim() !== originalLink.toLowerCase().trim() && shortLink.toLowerCase().trim() !== uniqueOriginalLink.toLowerCase().trim()) {
           return shortLink;
         }
       }
@@ -324,50 +335,57 @@ router.post("/admin/delete-premium", adminAuth, async (req, res) => {
 
 router.get("/shorten", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { post_name, ep_label } = req.query;
-  if (!post_name || !ep_label) return res.status(400).json({ error: "Missing parameters" });
+  const { ep_id, post_name, ep_label } = req.query;
 
   try {
-    const cleanPostName = post_name.trim();
-    const cleanEpLabel = ep_label.trim();
-
-    // Querying with .ilike and .trim() ensures case insensitivity and handles formatting matches on old episodes
-    const { data: post } = await supabase.from("posts").select("id").ilike("name", cleanPostName).single();
-    if (!post) return res.status(404).json({ error: "Post not found" });
-
-    const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).ilike("episode_label", cleanEpLabel).single();
+    let ep = null;
+    
+    // Strict ID matching ensures old and new episodes match reliably
+    if (ep_id) {
+      const { data } = await supabase.from("episodes").select("original_link").eq("id", ep_id).single();
+      ep = data;
+    } else if (post_name && ep_label) {
+      // Fallback fallback string lookup
+      const { data: post } = await supabase.from("posts").select("id").ilike("name", post_name.trim()).single();
+      if (post) {
+        const { data } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).ilike("episode_label", ep_label.trim()).single();
+        ep = data;
+      }
+    }
     
     if (!ep || !ep.original_link) {
-      return res.json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
+      return res.json({ error: "Is episode ke liye Download Link/Original Link uplabdh nahi hai!" });
     }
 
     const originalLink = ep.original_link;
+    // Generate distinct unique transaction link to bypass internal caches
+    const uniqueOriginalLink = appendRandomParam(originalLink);
 
     const { data: shorteners } = await supabase.from("shorteners").select("*");
     if (!shorteners || shorteners.length === 0) {
-      // SECURITY SHIELD: Return error if shorteners are missing to avoid giving raw original link bypass
-      return res.json({ error: "Koi shortener account configured nahi hai! Kripya admin settings me account connect karein." });
+      // SECURITY SHIELD: Original link is strictly locked, returning error if no shortener is connected
+      return res.json({ error: "Koi active shortener account configured nahi hai! Kripya settings check karein." });
     }
 
-    // Shuffling configured shorteners to distribute traffic randomly, while keeping them sequential for failover loops
+    // Shuffle configurations to balance traffic across valid active accounts
     const shuffledShorteners = [...shorteners].sort(() => Math.random() - 0.5);
     
     let shortLink = null;
     
-    // Sequential Retry Fallback: Tries all configured shorteners before returning an error
+    // Multi-Account Failover Loop: Cycles through accounts to verify generation
     for (const rawShortener of shuffledShorteners) {
       const { cleanUrl, cleanKey } = sanitizeShortener(rawShortener.dashboard_url, rawShortener.api_key);
-      shortLink = await fetchShortlink(cleanUrl, cleanKey, originalLink);
+      shortLink = await fetchShortlink(cleanUrl, cleanKey, originalLink, uniqueOriginalLink);
       if (shortLink && shortLink.startsWith("http")) {
-        break; // Stop immediately once a short link has successfully been generated
+        break; // Stop loop once verified shortened link is returned
       }
     }
     
     if (shortLink && shortLink.startsWith("http")) {
       res.json({ shortLink });
     } else {
-      // SECURITY SHIELD: Never leak direct original link if shortening calls fail
-      res.json({ error: "Shortener system is temporarily down or API Keys are invalid. Please contact the administrator." });
+      // SECURITY SHIELD: Blocks raw download link leak on any API network/key errors
+      res.json({ error: "Shortener system busy ya down hai. API Key ya Dashboard URL settings check karein." });
     }
   } catch (err) {
     res.json({ error: "Shortener process execution error: " + err.message });
@@ -378,7 +396,7 @@ router.get("/shorten", async (req, res) => {
 
 router.post("/verify-player", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { password, post_name, ep_label } = req.body;
+  const { password, post_name, ep_label, ep_id } = req.body;
 
   try {
     const { data: settings } = await supabase.from("settings").select("player_password").eq("id", 1).single();
@@ -388,10 +406,17 @@ router.post("/verify-player", async (req, res) => {
       return res.status(401).json({ error: "Streaming password galat hai!" });
     }
 
-    const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
-    if (!post) return res.status(404).json({ error: "Post not found" });
-
-    const { data: ep } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+    let ep = null;
+    if (ep_id) {
+      const { data } = await supabase.from("episodes").select("play_link").eq("id", ep_id).single();
+      ep = data;
+    } else if (post_name && ep_label) {
+      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
+      if (post) {
+        const { data } = await supabase.from("episodes").select("play_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+        ep = data;
+      }
+    }
     
     if (!ep || !ep.play_link) {
       return res.status(404).json({ error: "Is episode ke liye Stream Video Link uplabdh nahi hai!" });
@@ -508,7 +533,7 @@ router.post("/premium-login", async (req, res) => {
 
 router.post("/premium-bypass", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Database not connected" });
-  const { username, session_token, post_name, ep_label } = req.body;
+  const { username, session_token, post_name, ep_label, ep_id } = req.body;
   if (!username || !session_token) return res.status(401).json({ error: "Aap logged in nahi hain!" });
 
   try {
@@ -528,10 +553,17 @@ router.post("/premium-bypass", async (req, res) => {
       return res.status(403).json({ error: "Device Limit Reached! Is Gmail ID ko doosra device chala raha hai." });
     }
 
-    const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
-    if (!post) return res.status(404).json({ error: "Post not found" });
-
-    const { data: ep } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+    let ep = null;
+    if (ep_id) {
+      const { data } = await supabase.from("episodes").select("original_link").eq("id", ep_id).single();
+      ep = data;
+    } else if (post_name && ep_label) {
+      const { data: post } = await supabase.from("posts").select("id").eq("name", post_name).single();
+      if (post) {
+        const { data } = await supabase.from("episodes").select("original_link").eq("post_id", post.id).eq("episode_label", ep_label).single();
+        ep = data;
+      }
+    }
     
     if (!ep || !ep.original_link) {
       return res.status(404).json({ error: "Is episode ke liye Download Link uplabdh nahi hai!" });
